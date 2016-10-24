@@ -1,7 +1,9 @@
 import cv2
 import re
 import numpy as np
+import random
 from Tkinter import *
+from pprint import pprint
 
 '''
 charFindCount = 41
@@ -34,12 +36,43 @@ class matrixDataHandler:
 
 class userInterfaceHandler:
 
-	def __init__(self, tkMain):
-		uiFrame = Frame(tkMain)
-		uiFrame.pack()
-		self.quitOption = Button(uiFrame, text="QUIT", fg="red", command=uiFrame.quit)
-		self.quitOption.pack(side=LEFT)
+	frameHeight = 700
+	frameWidth = 1200
+	canvasHeight = frameHeight * 0.8
+	canvasWidth = frameWidth * 0.8
 
+
+	def __init__(self, tkMain):
+		self.tkMain = tkMain
+		self.uiFrame = Frame(self.tkMain)
+		self.uiFrame.pack()
+		self.tkMain.minsize(width=self.frameWidth, height=self.frameHeight)
+		self.tkMain.maxsize(width=self.frameWidth, height=self.frameHeight)
+		self.quitOption = Button(self.uiFrame, text="QUIT", fg="red", command=self.uiFrame.quit)
+
+	def renderNeuralNetVisualization(self,nnPerceptrons):
+		pprint(nnPerceptrons)
+		tkCanvas = Canvas(self.tkMain, width=self.canvasWidth, height=self.canvasHeight,background="grey")
+		tkCanvas.pack()
+		perceptronRadius = 10
+		perceptronX = 100
+		perceptronPadding = 10
+		perceptronY = 100
+		for perceptronLayer in range(0,len(nnPerceptrons)):
+			
+			for singlePerceptron in range(0,len(nnPerceptrons[perceptronLayer])):
+
+				tkCanvas.create_oval(perceptronX - perceptronRadius, perceptronY - perceptronRadius,
+					perceptronX + perceptronRadius, perceptronY + perceptronRadius)
+
+				for perceptronWeights in range(0,len(nnPerceptrons[perceptronLayer+1])):
+					tkCanvas.create_line(perceptronX, perceptronY, 200, 100)
+				perceptronY += (perceptronRadius*2) + perceptronPadding
+
+			print(perceptronX, perceptronY)
+			perceptronY = 100
+			perceptronX += 100
+		
 
 class neuralNetworkHandler:
 	
@@ -62,10 +95,23 @@ class neuralNetworkHandler:
 			self.nnPerceptrons.append(hiddenLayer)
 
 		self.nnPerceptrons.append(nnOutputs)
-		print(self.nnPerceptrons)
 
 		#populate weights
-		'''...'''
+		for perceptronLayer in range(0, len(self.nnPerceptrons)-1):
+			weightLayer = []
+			#print("Layer " + str(perceptronLayer) + ":/n")
+			layerLength = len(self.nnPerceptrons[perceptronLayer])
+			for singlePerceptron in range(0, layerLength):
+				perceptronWeights = []
+				#print("		Percept " + str(singlePerceptron)+ ":/n")
+				nextLayerCount = len(self.nnPerceptrons[perceptronLayer+1])
+				for singPerceptWeightCount in range(0,nextLayerCount):
+					#print("			Weight " + str(singPerceptWeightCount) + ":/n")
+					perceptronWeights.append(random.uniform(0,1))
+
+				weightLayer.append(perceptronWeights)
+			self.allWeights.append(weightLayer)
+
 
 	'''
 
@@ -98,8 +144,8 @@ def main():
 	matrixData.populateCharacterMatrices()
 
 	#neural network options
-	inputPerceptronCount = matrixDataHandler.matrixWidth * matrixDataHandler.matrixWidth
-	hiddenLayerDimensions = [3,15] #[hiddenLayer quanity, hiddenLayer length]
+	inputPerceptronCount = 7#matrixDataHandler.matrixWidth * matrixDataHandler.matrixWidth
+	hiddenLayerDimensions = [3,5] #[hiddenLayer quantity, hiddenLayer length]
 	outputPerceptronCount = 10
 
 	neuralNetwork = neuralNetworkHandler(hiddenLayerDimensions,										
@@ -110,8 +156,8 @@ def main():
 
 	tkMain = Tk()
 	userInterface = userInterfaceHandler(tkMain)
+	userInterface.renderNeuralNetVisualization(neuralNetwork.nnPerceptrons)
 	tkMain.mainloop()
-	tkMain.destroy()
 
 
 main()
