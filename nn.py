@@ -2,21 +2,8 @@ import cv2
 import re
 import numpy as np
 import random
-from Tkinter import *
 from pprint import pprint
 
-'''
-charFindCount = 41
-chars = []
-count = 0
-dataset = open('newdataset.txt', 'r').read().split(",")
-for char in range(charFindCount):
-	chars.append(np.zeros((28,28), dtype=np.uint8))
-	for pxCol in range(28):
-		for pxRow in range(28):
-			chars[char][pxCol][pxRow] = dataset[count]
-			count += 1
-'''
 
 class matrixDataHandler:
 	matrixWidth = 28
@@ -31,47 +18,50 @@ class matrixDataHandler:
 			for pxCol in range(self.matrixWidth):
 				for pxRow in range(self.matrixWidth):
 					matrix[pxCol][pxRow] = self.dataSet[pxCount]
-				pxCount += 1
+					pxCount += 1
+			self.characterMatrices.append(matrix)
 
 
 class userInterfaceHandler:
 
-	frameHeight = 700
-	frameWidth = 1200
-	canvasHeight = frameHeight * 0.8
-	canvasWidth = frameWidth * 0.8
+	frameHeight = 1000
+	frameWidth = 1600
+	canvasHeight = frameHeight * 0.9
+	canvasWidth = frameWidth * 0.9
 
 
-	def __init__(self, tkMain):
-		self.tkMain = tkMain
-		self.uiFrame = Frame(self.tkMain)
-		self.uiFrame.pack()
-		self.tkMain.minsize(width=self.frameWidth, height=self.frameHeight)
-		self.tkMain.maxsize(width=self.frameWidth, height=self.frameHeight)
-		self.quitOption = Button(self.uiFrame, text="QUIT", fg="red", command=self.uiFrame.quit)
-
+	def __init__(self):
+		self.uiCanvas = np.zeros((self.canvasHeight,self.canvasWidth), dtype=np.uint8)
+		
 	def renderNeuralNetVisualization(self,nnPerceptrons):
 		pprint(nnPerceptrons)
-		tkCanvas = Canvas(self.tkMain, width=self.canvasWidth, height=self.canvasHeight,background="grey")
-		tkCanvas.pack()
+
+		perceptronYstart = 20
 		perceptronRadius = 10
 		perceptronX = 100
-		perceptronPadding = 10
-		perceptronY = 100
+		perceptronDistX = 300
+		perceptronPadding = 15
+		perceptronY = perceptronYstart
+
 		for perceptronLayer in range(0,len(nnPerceptrons)):
 			
 			for singlePerceptron in range(0,len(nnPerceptrons[perceptronLayer])):
 
-				tkCanvas.create_oval(perceptronX - perceptronRadius, perceptronY - perceptronRadius,
-					perceptronX + perceptronRadius, perceptronY + perceptronRadius)
+				cv2.circle(self.uiCanvas, (perceptronX,perceptronY), perceptronRadius, (255), 1)
 
-				for perceptronWeights in range(0,len(nnPerceptrons[perceptronLayer+1])):
-					tkCanvas.create_line(perceptronX, perceptronY, 200, 100)
-				perceptronY += (perceptronRadius*2) + perceptronPadding
+				perceptronDistY = (perceptronRadius*2) + perceptronPadding
+				if(perceptronLayer < len(nnPerceptrons)-1):
+					perceptronYForLine = perceptronYstart
+					for perceptronWeights in range(0,len(nnPerceptrons[perceptronLayer+1])):
+						cv2.line(self.uiCanvas,(perceptronX, perceptronY), (perceptronX+perceptronDistX, perceptronYForLine),(255),1)
+						perceptronYForLine += perceptronDistY
 
-			print(perceptronX, perceptronY)
-			perceptronY = 100
-			perceptronX += 100
+				perceptronY += perceptronDistY
+
+			perceptronY = perceptronYstart
+			perceptronX += perceptronDistX
+
+		cv2.imshow("nn", self.uiCanvas);
 		
 
 class neuralNetworkHandler:
@@ -79,7 +69,6 @@ class neuralNetworkHandler:
 	#declare key data for nn structure
 	allWeights = []
 	nnPerceptrons = []
-
 
 	#construct object to develop specific network structure
 	def __init__(self, hiddenLayerDimensions, inputCount, outputCount, characterMatrices):
@@ -112,9 +101,7 @@ class neuralNetworkHandler:
 				weightLayer.append(perceptronWeights)
 			self.allWeights.append(weightLayer)
 
-
 	'''
-
 	def learnFeedForward(self):
 		takes single matrix
 		feeds forward
@@ -127,8 +114,22 @@ class neuralNetworkHandler:
 		loop through data
 		gets guess from ff
 		updates weights with bp
-	
 	'''
+	
+
+	def learnFeedForward(self, matrix):
+		ofMatrixToAnalyse = 2 #len(matrix)
+		pxCount = 0
+		for pxCol in range(ofMatrixToAnalyse):
+			for pxRow in range(ofMatrixToAnalyse):
+				self.nnPerceptrons[pxCount] = matrix[pxCol][pxRow]
+				pxCount += 1
+
+		print(self.nnPerceptrons)
+
+	def learnAnalyseIteration(self):
+		for matrix in self.characterMatrices:
+			learnFeedForward(matrix)
 
 	#activation function for thresholding given values 
 	def activateThreshold(self,value):
@@ -142,11 +143,13 @@ def main():
 
 	matrixData = matrixDataHandler()
 	matrixData.populateCharacterMatrices()
+	for i in range(9):
+		cv2.imshow("frame"+str(i),matrixData.characterMatrices[i])
 
 	#neural network options
-	inputPerceptronCount = 7#matrixDataHandler.matrixWidth * matrixDataHandler.matrixWidth
-	hiddenLayerDimensions = [3,5] #[hiddenLayer quantity, hiddenLayer length]
-	outputPerceptronCount = 10
+	inputPerceptronCount = 20#matrixDataHandler.matrixWidth * matrixDataHandler.matrixWidth
+	hiddenLayerDimensions = [3,25] #[hiddenLayer quantity, hiddenLayer length]
+	outputPerceptronCount = 20
 
 	neuralNetwork = neuralNetworkHandler(hiddenLayerDimensions,										
 								inputPerceptronCount,
@@ -154,13 +157,11 @@ def main():
 								matrixData.characterMatrices)
 
 
-	tkMain = Tk()
-	userInterface = userInterfaceHandler(tkMain)
+	userInterface = userInterfaceHandler()
 	userInterface.renderNeuralNetVisualization(neuralNetwork.nnPerceptrons)
-	tkMain.mainloop()
+
+	cv2.waitKey(0)
+	cv2.destroyAllWindows()
 
 
 main()
-
-'''cv2.waitKey(0)
-cv2.destroyAllWindows()'''
