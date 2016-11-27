@@ -6,180 +6,198 @@ import math
 from pprint import pprint
 
 
-class matrixDataHandler:
-	matrixWidth = 28
-	charactersToRetreive = 1000
-	dataSet = open('newdataset.txt', 'r').read().split(",")
-	characterMatrices = []
-	characterTargets = []
+class matrix_data_handler:
+	matrix_width = 28
+	characters_to_retreive = 1
+	data_set = open('newdataset.txt', 'r').read().split(",")
+	character_matrices = []
+	character_targets = []
 
-	def populateCharacterMatrices(self):
-		pxCount = 0
-		for i in range(self.charactersToRetreive):
-			matrix = np.zeros((self.matrixWidth,self.matrixWidth), dtype=np.uint8)
-			for pxCol in range(self.matrixWidth):
-				for pxRow in range(self.matrixWidth):
-					if(pxCount%(self.matrixWidth**2)==0):
-						self.characterTargets.append(int(self.dataSet[pxCount]))
+	def populate_character_matrices(self):
+		px_count = 0
+		for i in range(self.characters_to_retreive):
+			matrix = np.zeros((self.matrix_width,self.matrix_width), dtype=np.float32)
+			for px_col in range(self.matrix_width):
+				for px_row in range(self.matrix_width):
+					if(px_count%(self.matrix_width**2)==0):
+						self.character_targets.append(int(self.data_set[px_count]))
 					else:
-						matrix[pxCol][pxRow] = self.dataSet[pxCount]
-					pxCount += 1
-			self.characterMatrices.append(matrix)
+						matrix[px_col][px_row] = float(self.data_set[px_count]) / 255.0
+					px_count += 1
+			self.character_matrices.append(matrix)
 
 
-class userInterfaceHandler:
+class user_interface_handler:
 
-	frameHeight = 1000
-	frameWidth = 1600
-	canvasHeight = frameHeight * 0.9
-	canvasWidth = frameWidth * 0.9
+	frame_height = 1000
+	frame_width = 1600
+	canvas_height = frame_height * 0.9
+	canvas_width = frame_width * 0.9
 
 
 	def __init__(self):
-		self.uiCanvas = np.zeros((self.canvasHeight,self.canvasWidth), dtype=np.uint8)
+		self.ui_canvas = np.zeros((self.canvas_height,self.canvas_width), dtype=np.uint8)
 		
-	def renderNeuralNetVisualization(self,nnPerceptrons):
+	def render_neural_net_visualization(self,nn_perceptrons):
 
-		exampleInputLimitCount = 70 #zero for all
-		perceptronYstart = 20
-		perceptronRadius = 5
-		perceptronX = 100
-		perceptronDistX = 120
-		perceptronPadding = 15
-		perceptronY = perceptronYstart
+		example_input_limit_count = 30 #zero for all
+		perceptron_radius = 20
+		perceptron_x = 100
+		perceptron_dist_x = 400
+		perceptron_padding = 5
 
-		for perceptronLayer in range(0,len(nnPerceptrons)):
+		for perceptron_layer in range(0,len(nn_perceptrons)):
 			
-			lengthOfLayer = len(nnPerceptrons[perceptronLayer])
-			if(perceptronLayer==0 and exampleInputLimitCount > 0 and exampleInputLimitCount < lengthOfLayer):
-				lengthOfLayer = exampleInputLimitCount
-			for singlePerceptron in range(0,lengthOfLayer):
+			length_of_layer = len(nn_perceptrons[perceptron_layer])
+			
+			if(perceptron_layer==0 and example_input_limit_count > 0 and example_input_limit_count < length_of_layer):
+				length_of_layer = example_input_limit_count
 
-				cv2.circle(self.uiCanvas, (perceptronX,perceptronY), perceptronRadius, (255), 1)
+			perceptron_ystart = (self.frame_height - (length_of_layer*(perceptron_radius*2 + perceptron_padding)))/2
+			perceptron_y = perceptron_ystart
 
-				perceptronDistY = (perceptronRadius*2) + perceptronPadding
-				if(perceptronLayer < len(nnPerceptrons)-1):
-					perceptronYForLine = perceptronYstart
-					for perceptronWeights in range(0,len(nnPerceptrons[perceptronLayer+1])):
-						cv2.line(self.uiCanvas,(perceptronX, perceptronY), (perceptronX+perceptronDistX, perceptronYForLine),(255),1)
-						perceptronYForLine += perceptronDistY
+			for single_perceptron in range(0,length_of_layer):
 
-				perceptronY += perceptronDistY
+				cv2.circle(self.ui_canvas, (perceptron_x,perceptron_y), perceptron_radius, (255), 1)
 
-			perceptronY = perceptronYstart
-			perceptronX += perceptronDistX
+				perceptron_dist_y = (perceptron_radius*2) + perceptron_padding
+				if(perceptron_layer < len(nn_perceptrons)-1):
+					perceptron_y_for_line = (self.frame_height - (len(nn_perceptrons[perceptron_layer+1])*(perceptron_radius*2 + perceptron_padding)))/2
+					for perceptron_weights in range(0,len(nn_perceptrons[perceptron_layer+1])):
+						cv2.line(self.ui_canvas,(perceptron_x, perceptron_y), (perceptron_x+perceptron_dist_x, perceptron_y_for_line),(255),1)
+						perceptron_y_for_line += perceptron_dist_y
 
-		cv2.imshow("nn", self.uiCanvas)
+				perceptron_y += perceptron_dist_y
+			perceptron_x += perceptron_dist_x
+
+		cv2.imshow("nn", self.ui_canvas)
 		
 
-class neuralNetworkHandler:
+class neural_network_handler:
 	
 	#declare key data for nn structure
-	allWeights = []
-	nnPerceptrons = []
-	weightChangeRecord = []
+	all_weights = []
+	nn_perceptrons = []
+	weight_change_record = []
 
 	#construct object to develop specific network structure
-	def __init__(self, hiddenLayers, inputCount, outputCount, characterMatrices,characterTargets,learningConstant):
+	def __init__(self, hidden_layers, input_count, output_count, character_matrices,character_targets,learning_constant, testing_mode):
 
 		#populate perceptrons
-		print(inputCount, "yyeee")
-		nnInputs = np.zeros(inputCount)
-		nnOutputs = np.zeros(outputCount)
-		self.nnPerceptrons.append(nnInputs)
-		self.characterMatrices = characterMatrices
-		self.characterTargets = characterTargets
-		self.learningConstant = learningConstant
-		self.outputCount = outputCount
+		nn_inputs = np.zeros(input_count)
+		nn_outputs = np.zeros(output_count)
+		self.nn_perceptrons.append(nn_inputs)
+		self.character_matrices = character_matrices
+		self.character_targets = character_targets
+		self.learning_constant = learning_constant
+		self.output_count = output_count
+		self.testing_mode = testing_mode
 
-		for i in hiddenLayers:
-			hiddenLayer = np.zeros(i)
-			self.nnPerceptrons.append(hiddenLayer)
+		if(self.testing_mode == True):
+			self.of_matrix_to_analyse = 2
+			self.of_matrix_to_analyse_start = 10
+		else:
+			self.of_matrix_to_analyse = len(character_matrices[0])
+			self.of_matrix_to_analyse_start = 0
 
-		self.nnPerceptrons.append(nnOutputs)
+		for i in hidden_layers:
+			hidden_layer = np.zeros(i)
+			self.nn_perceptrons.append(hidden_layer)
+
+		self.nn_perceptrons.append(nn_outputs)
 
 		#populate weights
-		for perceptronLayer in range(1, len(self.nnPerceptrons)):
-			weightLayer = []
-			weightChangeRecordLayer = []
-			layerLength = len(self.nnPerceptrons[perceptronLayer])
-			for singlePerceptron in range(0, layerLength):
-				perceptronWeights = []
-				weightChangeRecordPerceptron = []
-				prevLayerCount = len(self.nnPerceptrons[perceptronLayer-1])
-				for singPerceptWeightCount in range(0,prevLayerCount):
-					perceptronWeights.append(random.uniform(0,1))
-					weightChangeRecordPerceptron.append(0)
+		for perceptron_layer in range(1, len(self.nn_perceptrons)):
+			weight_layer = []
+			weight_change_record_layer = []
+			layer_length = len(self.nn_perceptrons[perceptron_layer])
+			for single_perceptron in range(0, layer_length):
+				perceptron_weights = []
+				weight_change_record_perceptron = []
+				prev_layer_count = len(self.nn_perceptrons[perceptron_layer-1])
+				for sing_percept_weight_count in range(0,prev_layer_count):
+					perceptron_weights.append(random.uniform(0,1))
+					weight_change_record_perceptron.append(0)
 
-				weightLayer.append(perceptronWeights)
-				weightChangeRecordLayer.append(weightChangeRecordPerceptron)
+				weight_layer.append(perceptron_weights)
+				weight_change_record_layer.append(weight_change_record_perceptron)
 
-			self.allWeights.append(weightLayer)
-			self.weightChangeRecord.append(weightChangeRecordLayer)
+			self.all_weights.append(weight_layer)
+			self.weight_change_record.append(weight_change_record_layer)
 
-	def learnFeedForward(self, matrix):
-		ofMatrixToAnalyse = len(matrix)
-		ofMatrixToAnalyseStart = 0
-		pxCount = 0
-		for pxCol in range(ofMatrixToAnalyseStart,ofMatrixToAnalyseStart+ofMatrixToAnalyse):
-			for pxRow in range(ofMatrixToAnalyseStart,ofMatrixToAnalyseStart+ofMatrixToAnalyse):
-				self.nnPerceptrons[0][pxCount] = matrix[pxCol][pxRow]
-				pxCount += 1
 
-		for afterInputLayer in range(1, len(self.nnPerceptrons)):
-			for perceptronCount in range(0, len(self.nnPerceptrons[afterInputLayer])):
-				hiddenPerceptronSum = 0
-				for prevPerceptronCount in range(0,len(self.nnPerceptrons[afterInputLayer-1])): 
-					prevPerceptron = self.nnPerceptrons[afterInputLayer-1][prevPerceptronCount]
-					relevantWeight = self.allWeights[afterInputLayer-1][perceptronCount][prevPerceptronCount]
-					hiddenPerceptronSum += prevPerceptron * relevantWeight
+	def learn_feed_forward(self, matrix):
+		px_count = 0
+		for px_col in range(self.of_matrix_to_analyse_start,self.of_matrix_to_analyse_start+self.of_matrix_to_analyse):
+			for px_row in range(self.of_matrix_to_analyse_start,self.of_matrix_to_analyse_start+self.of_matrix_to_analyse):
+				self.nn_perceptrons[0][px_count] = matrix[px_col][px_row]
+				px_count += 1
+
+		for after_input_layer in range(1, len(self.nn_perceptrons)):
+			for perceptron_count in range(0, len(self.nn_perceptrons[after_input_layer])):
+				hidden_perceptron_sum = 0
+				for prev_perceptron_count in range(0,len(self.nn_perceptrons[after_input_layer-1])): 
+					prev_perceptron = self.nn_perceptrons[after_input_layer-1][prev_perceptron_count]
+					relevant_weight = self.all_weights[after_input_layer-1][perceptron_count][prev_perceptron_count]
+					hidden_perceptron_sum += prev_perceptron * relevant_weight
 				
-				self.nnPerceptrons[afterInputLayer][perceptronCount] = self.activateThreshold(hiddenPerceptronSum, "sigmoid")
+				self.nn_perceptrons[after_input_layer][perceptron_count] = self.activate_threshold(hidden_perceptron_sum, "sigmoid")
 
 
-	ccount = 0
+	test_counter = 0
 
-	def learnBackPropagation(self, targetVal):
-		targetVector = self.populateTargetVector(targetVal)
-		self.ccount += 1
-		for weightLayerCount in range(len(self.allWeights)-1,-1,-1):
+	def learn_back_propagation(self, target_val):
+		self.test_counter += 1
+		if(self.testing_mode == True):
+			target_val = random.randint(0, self.output_count-1)
+		
+		target_vector = self.populate_target_vector(target_val)
 
-			for weightPerceptronCount in range(0, len(self.allWeights[weightLayerCount])):
-				weightPerceptronVal = self.nnPerceptrons[weightLayerCount+1][weightPerceptronCount]
-				finalActivatedToSumStep = weightPerceptronVal * (1-weightPerceptronVal) #if sigmoid
+		if(self.nn_perceptrons[-1].tolist().index(max(self.nn_perceptrons[-1]))==target_val):
+			print("Correct")
 
-				if(weightLayerCount == len(self.allWeights)-1):
-					prevStepBackPropErrorVal = weightPerceptronVal - targetVector[weightPerceptronCount-1]
-					if( targetVector[weightPerceptronCount-1] == 1):
-						print(prevStepBackPropErrorVal)
+		output_error_total = 0
+		for weight_layer_count in range(len(self.all_weights)-1,-1,-1):
 
-				for singleWeightCount in range(0, len(self.allWeights[weightLayerCount][weightPerceptronCount])):
-					currentWeightVal = self.allWeights[weightLayerCount][weightPerceptronCount][singleWeightCount]
+			
+
+			for weight_perceptron_count in range(0, len(self.all_weights[weight_layer_count])):
+				weight_perceptron_val = self.nn_perceptrons[weight_layer_count+1][weight_perceptron_count]
+				final_activated_to_sum_step = weight_perceptron_val * (1-weight_perceptron_val) #if sigmoid
+
+				if(weight_layer_count == len(self.all_weights)-1):
+					prev_step_back_prop_error_val = weight_perceptron_val - target_vector[weight_perceptron_count-1]
+					output_error_total += (0.5*prev_step_back_prop_error_val)**2
+	
+				for single_weight_count in range(0, len(self.all_weights[weight_layer_count][weight_perceptron_count])):
+					current_weight_val = self.all_weights[weight_layer_count][weight_perceptron_count][single_weight_count]
 					
-					if(weightLayerCount != len(self.allWeights)-1):
-						weightChangeLayerToSum = weightLayerCount + 1
-						prevStepBackPropErrorVal  = 0
-						for weightChangePerceptronCount in range(0, len(self.weightChangeRecord[weightChangeLayerToSum])):
+					if(weight_layer_count != len(self.all_weights)-1):
+						weight_change_layer_to_sum = weight_layer_count + 1
+						prev_step_back_prop_error_val  = 0
+						for weight_change_perceptron_count in range(0, len(self.weight_change_record[weight_change_layer_to_sum])):
 							
-							previousWeightChange = self.weightChangeRecord[weightChangeLayerToSum][weightChangePerceptronCount][weightPerceptronCount]
-							prevStepBackPropErrorVal += previousWeightChange
+							previous_weight_change = self.weight_change_record[weight_change_layer_to_sum][weight_change_perceptron_count][weight_perceptron_count]
+							prev_step_back_prop_error_val += previous_weight_change
 
-					weightInputPerceptronVal = self.nnPerceptrons[weightLayerCount][singleWeightCount]
-					finalActivatedToWeight = finalActivatedToSumStep * weightInputPerceptronVal
-					fullStepBackVal = prevStepBackPropErrorVal * finalActivatedToWeight
-					self.weightChangeRecord[weightLayerCount][weightPerceptronCount][singleWeightCount] = fullStepBackVal
-					newWeightVal = currentWeightVal - (self.learningConstant * fullStepBackVal)
-					self.allWeights[weightLayerCount][weightPerceptronCount][singleWeightCount] = newWeightVal
+					weight_input_perceptron_val = self.nn_perceptrons[weight_layer_count][single_weight_count]
+					final_activated_to_weight = final_activated_to_sum_step * weight_input_perceptron_val
+					full_step_back_val = prev_step_back_prop_error_val * final_activated_to_weight
+					self.weight_change_record[weight_layer_count][weight_perceptron_count][single_weight_count] = full_step_back_val
+					new_weight_val = current_weight_val - (self.learning_constant * full_step_back_val)
+					self.all_weights[weight_layer_count][weight_perceptron_count][single_weight_count] = new_weight_val
+		print(output_error_total)
 
-	def learnAnalyseIteration(self):
-		matrix = self.characterMatrices[0]
-		targetVal = self.characterTargets[0]
-		for matrix in self.characterMatrices:
-			self.learnFeedForward(matrix)
-			self.learnBackPropagation(targetVal)
+	def learn_analyse_iteration(self):
+		matrix_count = 0
+		for matrix in self.character_matrices:
+			target_val = self.character_targets[matrix_count]
+			self.learn_feed_forward(matrix)
+			self.learn_back_propagation(target_val)
+			matrix_count += 1
 
 	#activation function for thresholding given values 
-	def activateThreshold(self,value, type):
+	def activate_threshold(self,value, type):
 		if(type == "step"):
 			if(value>=0.5):
 				return 1
@@ -189,9 +207,9 @@ class neuralNetworkHandler:
 			return 1/(1+(math.e**-value))
 
 
-	def populateTargetVector(self,target):
+	def populate_target_vector(self,target):
 		vector = []
-		for i in range(0,self.outputCount-1):
+		for i in range(0,self.output_count):
 			vector.append(0)
 		vector[target] = 1
 		return vector
@@ -199,29 +217,39 @@ class neuralNetworkHandler:
 
 def main():
 
-	matrixData = matrixDataHandler()
-	matrixData.populateCharacterMatrices()
-	'''for i in range(matrixData.charactersToRetreive):
-		cv2.imshow("frame"+str(i)+"-"+str(matrixData.characterTargets[i]),matrixData.characterMatrices[i])
-	'''
+	matrix_data = matrix_data_handler()
+	matrix_data.populate_character_matrices()
+	
 	#neural network options
-	inputPerceptronCount = matrixDataHandler.matrixWidth * matrixDataHandler.matrixWidth
-	hiddenLayers = [15] #[hidden layer length]
-	outputPerceptronCount = 10
-	learningConstant = 0.01
+	testing_mode = False
 
-	neuralNetwork = neuralNetworkHandler(hiddenLayers,										
-								inputPerceptronCount,
-								outputPerceptronCount,
-								matrixData.characterMatrices,
-								matrixData.characterTargets,
-								learningConstant)
+	if(testing_mode == True):
+		input_perceptron_count = 4#matrix_data_handler.matrix_width * matrix_data_handler.matrix_width
+		hidden_layers = [2,2] #[hidden layer length]
+		output_perceptron_count = 3
+		'''for i in range(matrix_data.characters_to_retreive):
+			cv2.imshow("frame"+str(i)+"-"+str(matrix_data.character_targets[i]),matrix_data.character_matrices[i])'''
+
+	else:
+		input_perceptron_count = matrix_data_handler.matrix_width * matrix_data_handler.matrix_width
+		hidden_layers = [15,15]
+		output_perceptron_count = 10
+	
+	learning_constant = 1
+
+	neural_network = neural_network_handler(hidden_layers,										
+								input_perceptron_count,
+								output_perceptron_count,
+								matrix_data.character_matrices,
+								matrix_data.character_targets,
+								learning_constant,
+								testing_mode)
 
 
-	#userInterface = userInterfaceHandler()
-	#userInterface.renderNeuralNetVisualization(neuralNetwork.nnPerceptrons)
+	user_interface = user_interface_handler()
+	user_interface.render_neural_net_visualization(neural_network.nn_perceptrons)
 
-	neuralNetwork.learnAnalyseIteration()
+	neural_network.learn_analyse_iteration()
 
 	cv2.waitKey(0)
 	cv2.destroyAllWindows()
