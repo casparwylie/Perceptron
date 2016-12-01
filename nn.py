@@ -8,7 +8,7 @@ from pprint import pprint
 
 class character_matrix_data_handler:
 	matrix_width = 28
-	characters_to_retreive = 30000
+	characters_to_retreive = 20000
 	data_set = open('newdataset.txt', 'r').read().split(",")
 	character_matrices = []
 	character_targets = []
@@ -46,7 +46,23 @@ class user_interface_handler:
 		perceptron_dist_x = 300
 		perceptron_padding = 5
 		bias_pos_diff_x = 100
+		bias_pos_diff_y = 100
 		bias_pos_y = perceptron_radius*2
+		highest_layer_count = 0
+		highest_layer_height = 0
+
+		def get_layer_height_px(layer_count):
+			return (layer_count*(perceptron_radius*2 + perceptron_padding))
+
+		for perceptron_layer in range(0,len(nn_perceptrons)):
+			length_of_layer = len(nn_perceptrons[perceptron_layer])
+			if(example_p_limit_count > 0 and example_p_limit_count < length_of_layer):
+				length_of_layer = example_p_limit_count
+			curr_layer_height = get_layer_height_px(length_of_layer)
+			if(curr_layer_height > highest_layer_height):
+				highest_layer_height = curr_layer_height
+				highest_layer_count = perceptron_layer
+
 
 		for perceptron_layer in range(0,len(nn_perceptrons)):
 			
@@ -54,13 +70,14 @@ class user_interface_handler:
 			if(example_p_limit_count > 0 and example_p_limit_count < length_of_layer):
 				length_of_layer = example_p_limit_count
 
-			perceptron_ystart = (self.frame_height - (length_of_layer*(perceptron_radius*2 + perceptron_padding)))/2
+			perceptron_ystart = (self.frame_height - get_layer_height_px(length_of_layer))/2
 			perceptron_y = perceptron_ystart
 			bias_center_point = (0,0)
 			layer_has_bias = ((perceptron_layer > 0) and (biases_for_non_input_layers[perceptron_layer-1] != 0))
 			if layer_has_bias == True:
 				if(biases_for_non_input_layers[perceptron_layer-1] == True):
-					bias_center_point = (perceptron_x-bias_pos_diff_x,bias_pos_y)
+					bias_y_pos = (self.frame_height - highest_layer_height)/2 - bias_pos_diff_y
+					bias_center_point = (perceptron_x-bias_pos_diff_x,bias_y_pos)
 					cv2.circle(self.ui_canvas, bias_center_point, perceptron_radius, (200), -1)
 					
 			for single_perceptron in range(0,length_of_layer):
@@ -196,17 +213,24 @@ class neural_network_handler:
 			target_vector = [target_val]
 		output_error_total = 0
 
-		#print("\n\n\n\n\n\n\n\n---neurons----")
-		#pprint(self.nn_perceptrons)
-		#print("\n\n---weights----")
-		#pprint(self.all_weights)
-		#print("\n\n---bias_weights----")
-		#pprint(self.biases_weights)
+		if(self.test_counter % 100 == 0):
+			print(self.test_counter)
+			print(self.nn_perceptrons[-1])
+			print(target_vector)
+			print("")
 
-		#if(self.test_counter % 500 == 0):
-		print(self.nn_perceptrons[-1])
-		print(target_vector)
-		print("")
+		'''if(self.test_counter % 100 == 0):
+			print("\n\n\n\n\n\n\n\n")
+			print(self.test_counter)
+			print(self.nn_perceptrons[-1])
+			print(target_vector)
+			print("")
+			print("---neurons----")
+			print(self.nn_perceptrons)
+			print("\n\n---weights----")
+			print(self.all_weights)
+			print("\n\n---bias_weights----")
+			print(self.biases_weights)'''
 
 		for weight_layer_count in range(len(self.all_weights)-1,-1,-1):
 			for weight_perceptron_count in range(0, len(self.all_weights[weight_layer_count])):
@@ -243,15 +267,19 @@ class neural_network_handler:
 					self.biases_weight_change_record[weight_layer_count][weight_perceptron_count] = full_step_back_for_bias_weight
 					new_bias_weight_val = current_bias_weight_val - (self.learning_constant * full_step_back_for_bias_weight)
 					self.biases_weights[weight_layer_count][weight_perceptron_count] = new_bias_weight_val
-
-		#print("\n\n---weights_changes----")
-		#pprint(self.weight_change_record)
-		#print("\n\n---bias_weights_changes----")
-		#pprint(self.biases_weight_change_record)
+		'''if(self.test_counter % 100 == 0):
+			print("\n\n---weights_changes----")
+			print(self.weight_change_record)
+			print("\n\n---bias_weights_changes----")
+			print(self.biases_weight_change_record)'''
 
 	def learn_analyse_iteration(self):
-		for i in range(0,10000):
-			matrix_count = 0
+		matrix_count = 0
+		repeat_count = 1
+		if(self.testing_mode == True):
+			repeat_count = 5000
+
+		for i in range(0,repeat_count):
 			for matrix in self.matrix_data:
 				target_val = self.matrix_targets[matrix_count]
 				self.learn_feed_forward(matrix)
@@ -283,7 +311,7 @@ def main():
 	
 	
 	#neural network options
-	testing_mode = True
+	testing_mode = False
 	if(testing_mode == True):
 		input_perceptron_count = 2
 		hidden_layers = [4] 
@@ -291,20 +319,20 @@ def main():
 		matrix_data = [[1,1],[0,1],[1,0],[0,0]]
 		matrix_targets = [1,0,0,1]
 		biases_for_non_input_layers = [1,1]
-		#for i in range(matrix_data.characters_to_retreive):
-			#cv2.imshow("frame"+str(i)+"-"+str(matrix_data.character_targets[i]),matrix_data.character_matrices[i])
 
 	else:
 		character_matrix_data = character_matrix_data_handler()
 		character_matrix_data.populate_character_matrices()
+		'''for i in range(character_matrix_data.characters_to_retreive):
+			cv2.imshow("frame"+str(i)+"-"+str(character_matrix_data.character_targets[i]),character_matrix_data.character_matrices[i])'''
 		input_perceptron_count = character_matrix_data_handler.matrix_width * character_matrix_data_handler.matrix_width
-		hidden_layers = [30,30]
+		hidden_layers = [30, 30]
 		biases_for_non_input_layers = [1,1,1]
 		matrix_data = character_matrix_data.character_matrices
 		matrix_targets = character_matrix_data.character_targets
 		output_perceptron_count = 10
 	
-	learning_constant = 0.5
+	learning_constant = 2
 
 	if(len(biases_for_non_input_layers) != len(hidden_layers)+1):
 		print("bias count mismatch")
