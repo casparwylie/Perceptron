@@ -143,15 +143,12 @@ class neural_network_handler:
 			weight_change_record_layer = []
 			layer_length = len(self.nn_perceptrons[perceptron_layer])
 			for single_perceptron in range(0, layer_length):
-				perceptron_weights = []
-				weight_change_record_perceptron = []
 				prev_layer_count = len(self.nn_perceptrons[perceptron_layer-1])
-				for sing_percept_weight_count in range(0,prev_layer_count):
-					perceptron_weights.append(self.initilize_weight())
-					weight_change_record_perceptron.append(0)
-
+				perceptron_weights = self.initilize_weights(prev_layer_count)
+				weights_change_record_perceptron = np.zeros(prev_layer_count)
+		
 				weight_layer.append(perceptron_weights)
-				weight_change_record_layer.append(weight_change_record_perceptron)
+				weight_change_record_layer.append(weights_change_record_perceptron)
 
 			self.all_weights.append(weight_layer)
 			self.weight_change_record.append(weight_change_record_layer)
@@ -160,30 +157,27 @@ class neural_network_handler:
 			single_bias_weights = []
 			single_bias_weights_change = []
 			if(self.biases_for_non_input_layers[layer_count]!=0):
-				for perceptron_count in range(0,len(self.nn_perceptrons[layer_count+1])):
-					single_bias_weights.append(self.initilize_weight())
-					single_bias_weights_change.append(0)
+				bias_input_count = len(self.nn_perceptrons[layer_count+1])
+				single_bias_weights = self.initilize_weights(bias_input_count)
+				single_bias_weights_change = np.zeros(bias_input_count)
 			self.biases_weights.append(single_bias_weights)
 			self.biases_weight_change_record.append(single_bias_weights_change)
 
 
-	def initilize_weight(self):
-		return random.uniform(-1,1)
+	def initilize_weights(self,size):
+		return np.random.uniform(low=-1, high=1, size=(size))
 
 	def learn_feed_forward(self, matrix):
 		self.populate_input_layer(matrix)
 		for after_input_layer in range(1, len(self.nn_perceptrons)):
 			for perceptron_count in range(0, len(self.nn_perceptrons[after_input_layer])):
-				hidden_perceptron_sum = 0
-				for prev_perceptron_count in range(0,len(self.nn_perceptrons[after_input_layer-1])): 
-					prev_perceptron = self.nn_perceptrons[after_input_layer-1][prev_perceptron_count]
-					relevant_weight = self.all_weights[after_input_layer-1][perceptron_count][prev_perceptron_count]
-					hidden_perceptron_sum += prev_perceptron * relevant_weight
-				
+				relevant_weights = self.all_weights[after_input_layer-1][perceptron_count]
+				outputs_feed_through_weights = np.dot(relevant_weights, self.nn_perceptrons[after_input_layer-1])
+				hidden_perceptron_sum = outputs_feed_through_weights.sum()
 				if(len(self.biases_weights[after_input_layer-1])!=0):
 					hidden_perceptron_sum += self.biases_for_non_input_layers[after_input_layer-1] * self.biases_weights[after_input_layer-1][perceptron_count]
-				
 				self.nn_perceptrons[after_input_layer][perceptron_count] = self.activate_threshold(hidden_perceptron_sum, "sigmoid")
+
 
 
 	def populate_input_layer(self, data):
@@ -206,20 +200,19 @@ class neural_network_handler:
 	def learn_back_propagation(self, target_val):
 
 		self.test_counter += 1
-
 		if(len(self.nn_perceptrons[-1])>1):
 			target_vector = self.populate_target_vector(target_val)
 		else:
 			target_vector = [target_val]
 		output_error_total = 0
 
-		if(self.test_counter % 100 == 0):
-			print(self.test_counter)
+		if(self.test_counter % 500 == 0):
+			#print(self.test_counter)
 			print(self.nn_perceptrons[-1])
 			print(target_vector)
 			print("")
 
-		'''if(self.test_counter % 100 == 0):
+		'''if(self.test_counter % 1 == 0):
 			print("\n\n\n\n\n\n\n\n")
 			print(self.test_counter)
 			print(self.nn_perceptrons[-1])
@@ -267,23 +260,27 @@ class neural_network_handler:
 					self.biases_weight_change_record[weight_layer_count][weight_perceptron_count] = full_step_back_for_bias_weight
 					new_bias_weight_val = current_bias_weight_val - (self.learning_constant * full_step_back_for_bias_weight)
 					self.biases_weights[weight_layer_count][weight_perceptron_count] = new_bias_weight_val
-		'''if(self.test_counter % 100 == 0):
+		'''if(self.test_counter % 1 == 0):
 			print("\n\n---weights_changes----")
 			print(self.weight_change_record)
 			print("\n\n---bias_weights_changes----")
 			print(self.biases_weight_change_record)'''
 
 	def learn_analyse_iteration(self):
-		matrix_count = 0
+		
 		repeat_count = 1
 		if(self.testing_mode == True):
 			repeat_count = 5000
 
 		for i in range(0,repeat_count):
+			matrix_count = 0
 			for matrix in self.matrix_data:
 				target_val = self.matrix_targets[matrix_count]
 				self.learn_feed_forward(matrix)
 				self.learn_back_propagation(target_val)
+				if(matrix_count % 500 == 0):
+					cv2.imshow("framel",matrix)
+					cv2.waitKey(1)
 				matrix_count += 1
 
 
@@ -323,16 +320,14 @@ def main():
 	else:
 		character_matrix_data = character_matrix_data_handler()
 		character_matrix_data.populate_character_matrices()
-		'''for i in range(character_matrix_data.characters_to_retreive):
-			cv2.imshow("frame"+str(i)+"-"+str(character_matrix_data.character_targets[i]),character_matrix_data.character_matrices[i])'''
 		input_perceptron_count = character_matrix_data_handler.matrix_width * character_matrix_data_handler.matrix_width
-		hidden_layers = [30, 30]
-		biases_for_non_input_layers = [1,1,1]
+		hidden_layers = [30]
+		biases_for_non_input_layers = [1,1]
 		matrix_data = character_matrix_data.character_matrices
 		matrix_targets = character_matrix_data.character_targets
 		output_perceptron_count = 10
 	
-	learning_constant = 2
+	learning_constant = 0.5
 
 	if(len(biases_for_non_input_layers) != len(hidden_layers)+1):
 		print("bias count mismatch")
@@ -349,11 +344,10 @@ def main():
 
 	user_interface = user_interface_handler()
 	user_interface.render_neural_net_visualization(neural_network.nn_perceptrons,biases_for_non_input_layers)
-
+	cv2.waitKey(1)
 	neural_network.learn_analyse_iteration()
 
-	cv2.waitKey(0)
-	cv2.destroyAllWindows()
+	
 
 
 main()
