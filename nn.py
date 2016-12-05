@@ -5,12 +5,26 @@ import numpy as np
 import random
 import math
 from pprint import pprint
+from Tkinter import *
 from decimal import *
+import os
+
+'''
+class data_preprocessor_handler:
+
+	def image_dir_to_matrix_txt(self, dirname):
+		new_txt_file = open(dirname+".txt", "a")
+		image_file_names = os.listdir(dirname)
+		for image_file_name in image_file_names:
+		 	if(image_file_name[0:1] != "."):
+		 		print(image_file_name)
+
+'''
 
 
 class character_matrix_data_handler:
 	matrix_width = 28
-	characters_to_retreive = 40000
+	characters_to_retreive = 1000
 	data_set = open('newdataset.txt', 'r').read().split(",")
 	character_matrices = []
 	character_targets = []
@@ -31,24 +45,45 @@ class character_matrix_data_handler:
 
 class user_interface_handler:
 
-	frame_height = 1000
-	frame_width = 1600
-	canvas_height = int(frame_height * 0.9)
-	canvas_width = int(frame_width * 0.9)
+	frame_height = 200
+	frame_width = 500
 
+	def __init__(self, tk_main, neural_network):
+		self.tk_main = tk_main
+		self.ui_frame = Frame(self.tk_main)
+		self.tk_main.title("Neural Network Constructor")
+		self.ui_frame.pack()
+		self.neural_network = neural_network
+		self.tk_main.minsize(width=self.frame_width, height=self.frame_height)
+ 		self.tk_main.maxsize(width=self.frame_width, height=self.frame_height)
+ 		self.quit_opt = Button(self.ui_frame, text="QUIT", fg="red", command=self.ui_frame.quit)
+ 		self.quit_opt.pack()
+ 		self.render_ui_widgets()
 
-	def __init__(self):
-		self.ui_canvas = np.zeros((self.canvas_height,self.canvas_width), dtype=np.uint8)
-		
-	def render_neural_net_visualization(self,nn_perceptrons,biases_for_non_input_layers):
+ 	def render_ui_widgets(self):
+ 		start_learning_opt = Button(self.ui_frame, text="START LEARNING", command=self.neural_network.learn_analyse_iteration)
+ 		start_learning_opt.pack()
+
+ 		show_visual_nn_opt = Button(self.ui_frame, text="SEE NETWORK VISUALIZATION", command=self.render_neural_net_visualization)
+ 		show_visual_nn_opt.pack()
+
+	def render_neural_net_visualization(self):
+		canvas_height = 700
+		canvas_width = 1300
+		self.ui_nn_frame = Toplevel(self.tk_main)
+		self.ui_nn_frame.title("Neural Network Visualization")
+		tk_nn_visual_canvas = Canvas(self.ui_nn_frame, width=canvas_width, height=canvas_height,background="grey")
+		tk_nn_visual_canvas.pack()
+		nn_perceptrons = self.neural_network.nn_perceptrons
+		biases_for_non_input_layers = self.neural_network.biases_for_non_input_layers
 
 		example_p_limit_count = 20 #zero for all
-		perceptron_radius = 15
-		perceptron_x = 100
+		perceptron_radius = 10
+		perceptron_x = 50
 		perceptron_dist_x = 300
 		perceptron_padding = 5
-		bias_pos_diff_x = 100
-		bias_pos_diff_y = 100
+		bias_pos_diff_x = 50
+		bias_pos_diff_y = 50
 		bias_pos_y = perceptron_radius*2
 		highest_layer_count = 0
 		highest_layer_height = 0
@@ -72,38 +107,34 @@ class user_interface_handler:
 			if(example_p_limit_count > 0 and example_p_limit_count < length_of_layer):
 				length_of_layer = example_p_limit_count
 
-			perceptron_ystart = (self.frame_height - get_layer_height_px(length_of_layer))/2
+			perceptron_ystart = (canvas_height - get_layer_height_px(length_of_layer))/2
 			perceptron_y = perceptron_ystart
-			bias_center_point = (0,0)
 			layer_has_bias = ((perceptron_layer > 0) and (biases_for_non_input_layers[perceptron_layer-1] != 0))
+			
 			if layer_has_bias == True:
 				if(biases_for_non_input_layers[perceptron_layer-1] == True):
-					bias_y_pos = (self.frame_height - highest_layer_height)/2 - bias_pos_diff_y
-					bias_center_point = (perceptron_x-bias_pos_diff_x,bias_y_pos)
-					cv2.circle(self.ui_canvas, bias_center_point, perceptron_radius, (200), -1)
-					
+					bias_y_pos = (canvas_height - highest_layer_height)/2 - bias_pos_diff_y
+					bias_x_pos = perceptron_x-bias_pos_diff_x
+					tk_nn_visual_canvas.create_oval(bias_x_pos-perceptron_radius,bias_y_pos-perceptron_radius,bias_x_pos+perceptron_radius,bias_y_pos+perceptron_radius)
+			
 			for single_perceptron in range(0,length_of_layer):
-
-				cv2.circle(self.ui_canvas, (perceptron_x,perceptron_y), perceptron_radius, (255), -1)
+				tk_nn_visual_canvas.create_oval(perceptron_x-perceptron_radius,perceptron_y-perceptron_radius,perceptron_x+perceptron_radius,perceptron_y+perceptron_radius)
 				if(layer_has_bias == True):
-					cv2.line(self.ui_canvas,(perceptron_x, perceptron_y), bias_center_point,(255),1)
+					tk_nn_visual_canvas.create_line(perceptron_x, perceptron_y, bias_x_pos,bias_y_pos)
 
 				perceptron_dist_y = (perceptron_radius*2) + perceptron_padding
 				if(perceptron_layer < len(nn_perceptrons)-1):
 					length_of_next_layer = len(nn_perceptrons[perceptron_layer+1])
 					if(example_p_limit_count > 0 and example_p_limit_count < length_of_next_layer):
 						length_of_next_layer = example_p_limit_count
-					perceptron_y_for_line = (self.frame_height - (length_of_next_layer)*(perceptron_radius*2 + perceptron_padding))/2
+					perceptron_y_for_line = (canvas_height - (length_of_next_layer)*(perceptron_radius*2 + perceptron_padding))/2
 					for perceptron_weights in range(0,length_of_next_layer):
-						cv2.line(self.ui_canvas,(perceptron_x, perceptron_y), (perceptron_x+perceptron_dist_x, perceptron_y_for_line),(255),1)
+						tk_nn_visual_canvas.create_line(perceptron_x, perceptron_y, perceptron_x+perceptron_dist_x, perceptron_y_for_line)
 						perceptron_y_for_line += perceptron_dist_y
 
 				perceptron_y += perceptron_dist_y
 			perceptron_x += perceptron_dist_x
-
-		cv2.imshow("nn", self.ui_canvas)
 		
-
 class neural_network_handler:
 
 	#construct object to develop specific network structure
@@ -203,7 +234,7 @@ class neural_network_handler:
 
 
 	test_counter = 0
-	test_print_interval = 100
+	test_print_interval = 10
 
 	def learn_back_propagation(self, target_val):
 		
@@ -216,25 +247,10 @@ class neural_network_handler:
 		if(self.test_counter % self.test_print_interval == 0):
 			print(self.test_counter)
 			for i in self.nn_perceptrons[-1]:
-				if(i>1):
-					print("error? over 1 found.")
 				print(str('{0:.10f}'.format(i)),end=" | ")
 			print("\n")
 			print(target_vector)
 			print("")
-
-		'''if(self.test_counter % 1 == 0):
-			print("\n\n\n\n\n\n\n\n")
-			print(self.test_counter)
-			print(self.nn_perceptrons[-1])
-			print(target_vector)
-			print("")
-			print("---neurons----")
-			print(self.nn_perceptrons)
-			print("\n\n---weights----")
-			print(self.all_weights)
-			print("\n\n---bias_weights----")
-			print(self.biases_weights)'''
 
 		for weight_layer_count in range(len(self.all_weights)-1,-1,-1):
 			for weight_perceptron_count in range(0, len(self.all_weights[weight_layer_count])):
@@ -242,7 +258,7 @@ class neural_network_handler:
 				final_activated_to_sum_step = weight_perceptron_val * (1-weight_perceptron_val) #if sigmoid
 				
 				if(weight_layer_count == len(self.all_weights)-1):
-					prev_step_back_prop_error_val = weight_perceptron_val - target_vector[weight_perceptron_count-1]
+					prev_step_back_prop_error_val = weight_perceptron_val - target_vector[weight_perceptron_count]
 					output_error_total += (0.5*prev_step_back_prop_error_val)**2
 	
 				for single_weight_count in range(0, len(self.all_weights[weight_layer_count][weight_perceptron_count])):
@@ -282,15 +298,9 @@ class neural_network_handler:
 		repeat_count = 1
 		if(self.testing_mode == True):
 			repeat_count = 5000
-
 		for i in range(0,repeat_count):
 			matrix_count = 0
 			for matrix in self.matrix_data:
-				if(matrix_count % self.test_print_interval == 0):
-					if(self.testing_mode == False):
-						cv2.imshow("framel",matrix)
-						cv2.waitKey(1)
-
 				target_val = self.matrix_targets[matrix_count]
 				self.learn_feed_forward(matrix)
 				self.learn_back_propagation(target_val)
@@ -318,12 +328,10 @@ class neural_network_handler:
 
 
 def main():
-
-	
 	
 	#neural network options
-	testing_mode = True
-	if(testing_mode == False):
+	testing_mode = False
+	if(testing_mode == True):
 		input_perceptron_count = 2
 		hidden_layers = [4] 
 		output_perceptron_count = 1
@@ -335,17 +343,18 @@ def main():
 		character_matrix_data = character_matrix_data_handler()
 		character_matrix_data.populate_character_matrices()
 		input_perceptron_count = character_matrix_data_handler.matrix_width * character_matrix_data_handler.matrix_width
-		hidden_layers = [300]
+		hidden_layers = [30]
 		biases_for_non_input_layers = [1,1]
 		matrix_data = character_matrix_data.character_matrices
 		matrix_targets = character_matrix_data.character_targets
 		output_perceptron_count = 10
 	
-	learning_constant = 0.1
+	learning_constant = 0.5
 
 	if(len(biases_for_non_input_layers) != len(hidden_layers)+1):
 		print("bias count mismatch")
 
+	
 	neural_network = neural_network_handler(hidden_layers,										
 								input_perceptron_count,
 								output_perceptron_count,
@@ -356,12 +365,8 @@ def main():
 								testing_mode)
 
 
-	user_interface = user_interface_handler()
-	user_interface.render_neural_net_visualization(neural_network.nn_perceptrons,biases_for_non_input_layers)
-	cv2.waitKey(1)
-	neural_network.learn_analyse_iteration()
-
+	tk_main = Tk()
+	user_interface = user_interface_handler(tk_main, neural_network)
+	tk_main.mainloop()
 	
-
-
 main()
