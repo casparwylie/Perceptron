@@ -1,14 +1,16 @@
+from __future__ import print_function
 import cv2
 import re
 import numpy as np
 import random
 import math
 from pprint import pprint
+from decimal import *
 
 
 class character_matrix_data_handler:
 	matrix_width = 28
-	characters_to_retreive = 20000
+	characters_to_retreive = 40000
 	data_set = open('newdataset.txt', 'r').read().split(",")
 	character_matrices = []
 	character_targets = []
@@ -174,9 +176,11 @@ class neural_network_handler:
 				relevant_weights = self.all_weights[after_input_layer-1][perceptron_count]
 				outputs_feed_through_weights = np.dot(relevant_weights, self.nn_perceptrons[after_input_layer-1])
 				hidden_perceptron_sum = outputs_feed_through_weights.sum()
+				#print("sum",hidden_perceptron_sum)
 				if(len(self.biases_weights[after_input_layer-1])!=0):
 					hidden_perceptron_sum += self.biases_for_non_input_layers[after_input_layer-1] * self.biases_weights[after_input_layer-1][perceptron_count]
 				self.nn_perceptrons[after_input_layer][perceptron_count] = self.activate_threshold(hidden_perceptron_sum, "sigmoid")
+				#print("act",self.nn_perceptrons[after_input_layer][perceptron_count])
 
 
 
@@ -191,24 +195,31 @@ class neural_network_handler:
 					self.nn_perceptrons[0][value_count] = data[col][row]
 					value_count += 1
 
-	test_counter = 0
+	
 	def process_single_full_back_prop(self,input_perceptron_val, act_to_sum, prev_step_back_prop_error_val):
 		final_activated_to_weight = act_to_sum * input_perceptron_val
 		full_step_back_val = prev_step_back_prop_error_val * final_activated_to_weight
 		return full_step_back_val
 
-	def learn_back_propagation(self, target_val):
 
-		self.test_counter += 1
+	test_counter = 0
+	test_print_interval = 100
+
+	def learn_back_propagation(self, target_val):
+		
 		if(len(self.nn_perceptrons[-1])>1):
 			target_vector = self.populate_target_vector(target_val)
 		else:
 			target_vector = [target_val]
 		output_error_total = 0
 
-		if(self.test_counter % 500 == 0):
-			#print(self.test_counter)
-			print(self.nn_perceptrons[-1])
+		if(self.test_counter % self.test_print_interval == 0):
+			print(self.test_counter)
+			for i in self.nn_perceptrons[-1]:
+				if(i>1):
+					print("error? over 1 found.")
+				print(str('{0:.10f}'.format(i)),end=" | ")
+			print("\n")
 			print(target_vector)
 			print("")
 
@@ -265,9 +276,9 @@ class neural_network_handler:
 			print(self.weight_change_record)
 			print("\n\n---bias_weights_changes----")
 			print(self.biases_weight_change_record)'''
+		self.test_counter += 1
 
 	def learn_analyse_iteration(self):
-		
 		repeat_count = 1
 		if(self.testing_mode == True):
 			repeat_count = 5000
@@ -275,12 +286,15 @@ class neural_network_handler:
 		for i in range(0,repeat_count):
 			matrix_count = 0
 			for matrix in self.matrix_data:
+				if(matrix_count % self.test_print_interval == 0):
+					if(self.testing_mode == False):
+						cv2.imshow("framel",matrix)
+						cv2.waitKey(1)
+
 				target_val = self.matrix_targets[matrix_count]
 				self.learn_feed_forward(matrix)
 				self.learn_back_propagation(target_val)
-				if(matrix_count % 500 == 0):
-					cv2.imshow("framel",matrix)
-					cv2.waitKey(1)
+				
 				matrix_count += 1
 
 
@@ -292,7 +306,7 @@ class neural_network_handler:
 			else:
 				return 0
 		elif(type == "sigmoid"):
-			return 1/(1+(math.e**-value))
+			return 1/(1+(math.exp(-value)))
 
 
 	def populate_target_vector(self,target):
@@ -308,8 +322,8 @@ def main():
 	
 	
 	#neural network options
-	testing_mode = False
-	if(testing_mode == True):
+	testing_mode = True
+	if(testing_mode == False):
 		input_perceptron_count = 2
 		hidden_layers = [4] 
 		output_perceptron_count = 1
@@ -321,13 +335,13 @@ def main():
 		character_matrix_data = character_matrix_data_handler()
 		character_matrix_data.populate_character_matrices()
 		input_perceptron_count = character_matrix_data_handler.matrix_width * character_matrix_data_handler.matrix_width
-		hidden_layers = [30]
+		hidden_layers = [300]
 		biases_for_non_input_layers = [1,1]
 		matrix_data = character_matrix_data.character_matrices
 		matrix_targets = character_matrix_data.character_targets
 		output_perceptron_count = 10
 	
-	learning_constant = 0.5
+	learning_constant = 0.1
 
 	if(len(biases_for_non_input_layers) != len(hidden_layers)+1):
 		print("bias count mismatch")
