@@ -24,7 +24,7 @@ class data_preprocessor_handler:
 
 class character_matrix_data_handler:
 	matrix_width = 28
-	characters_to_retreive = 1000
+	characters_to_retreive = 20000
 	data_set = open('newdataset.txt', 'r').read().split(",")
 	character_matrices = []
 	character_targets = []
@@ -80,7 +80,7 @@ class user_interface_handler:
 		example_p_limit_count = 20 #zero for all
 		perceptron_radius = 10
 		perceptron_x = 50
-		perceptron_dist_x = 300
+		perceptron_dist_x = 400
 		perceptron_padding = 5
 		bias_pos_diff_x = 50
 		bias_pos_diff_y = 50
@@ -234,8 +234,8 @@ class neural_network_handler:
 
 
 	test_counter = 0
-	test_print_interval = 10
-
+	test_print_interval = 100
+	interval_correct_count = 0
 	def learn_back_propagation(self, target_val):
 		
 		if(len(self.nn_perceptrons[-1])>1):
@@ -244,12 +244,15 @@ class neural_network_handler:
 			target_vector = [target_val]
 		output_error_total = 0
 
+		outputs_as_list = self.nn_perceptrons[-1].tolist()
+		if(outputs_as_list.index(max(outputs_as_list))==target_val):
+			self.interval_correct_count += 1
+
+
 		if(self.test_counter % self.test_print_interval == 0):
 			print(self.test_counter)
-			for i in self.nn_perceptrons[-1]:
-				print(str('{0:.10f}'.format(i)),end=" | ")
-			print("\n")
-			print(target_vector)
+			print(str(self.interval_correct_count)+"%")
+			self.interval_correct_count = 0
 			print("")
 
 		for weight_layer_count in range(len(self.all_weights)-1,-1,-1):
@@ -287,11 +290,6 @@ class neural_network_handler:
 					self.biases_weight_change_record[weight_layer_count][weight_perceptron_count] = full_step_back_for_bias_weight
 					new_bias_weight_val = current_bias_weight_val - (self.learning_constant * full_step_back_for_bias_weight)
 					self.biases_weights[weight_layer_count][weight_perceptron_count] = new_bias_weight_val
-		'''if(self.test_counter % 1 == 0):
-			print("\n\n---weights_changes----")
-			print(self.weight_change_record)
-			print("\n\n---bias_weights_changes----")
-			print(self.biases_weight_change_record)'''
 		self.test_counter += 1
 
 	def learn_analyse_iteration(self):
@@ -343,7 +341,7 @@ def main():
 		character_matrix_data = character_matrix_data_handler()
 		character_matrix_data.populate_character_matrices()
 		input_perceptron_count = character_matrix_data_handler.matrix_width * character_matrix_data_handler.matrix_width
-		hidden_layers = [30]
+		hidden_layers = [500]
 		biases_for_non_input_layers = [1,1]
 		matrix_data = character_matrix_data.character_matrices
 		matrix_targets = character_matrix_data.character_targets
