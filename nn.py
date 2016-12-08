@@ -24,7 +24,7 @@ class data_preprocessor_handler:
 
 class character_matrix_data_handler:
 	matrix_width = 28
-	characters_to_retreive = 20000
+	characters_to_retreive = 5000
 	data_set = open('newdataset.txt', 'r').read().split(",")
 	character_matrices = []
 	character_targets = []
@@ -206,7 +206,7 @@ class neural_network_handler:
 			for perceptron_count in range(0, len(self.nn_perceptrons[after_input_layer])):
 				relevant_weights = self.all_weights[after_input_layer-1][perceptron_count]
 				outputs_feed_through_weights = np.dot(relevant_weights, self.nn_perceptrons[after_input_layer-1])
-				hidden_perceptron_sum = outputs_feed_through_weights.sum()
+				hidden_perceptron_sum = outputs_feed_through_weights
 				#print("sum",hidden_perceptron_sum)
 				if(len(self.biases_weights[after_input_layer-1])!=0):
 					hidden_perceptron_sum += self.biases_for_non_input_layers[after_input_layer-1] * self.biases_weights[after_input_layer-1][perceptron_count]
@@ -290,6 +290,7 @@ class neural_network_handler:
 					self.biases_weight_change_record[weight_layer_count][weight_perceptron_count] = full_step_back_for_bias_weight
 					new_bias_weight_val = current_bias_weight_val - (self.learning_constant * full_step_back_for_bias_weight)
 					self.biases_weights[weight_layer_count][weight_perceptron_count] = new_bias_weight_val
+		
 		self.test_counter += 1
 
 	def learn_analyse_iteration(self):
@@ -341,7 +342,7 @@ def main():
 		character_matrix_data = character_matrix_data_handler()
 		character_matrix_data.populate_character_matrices()
 		input_perceptron_count = character_matrix_data_handler.matrix_width * character_matrix_data_handler.matrix_width
-		hidden_layers = [500]
+		hidden_layers = [30]
 		biases_for_non_input_layers = [1,1]
 		matrix_data = character_matrix_data.character_matrices
 		matrix_targets = character_matrix_data.character_targets
