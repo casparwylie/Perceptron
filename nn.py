@@ -24,7 +24,7 @@ class data_preprocessor_handler:
 
 class character_matrix_data_handler:
 	matrix_width = 28
-	characters_to_retreive = 5000
+	characters_to_retreive = 40000
 	data_set = open('newdataset.txt', 'r').read().split(",")
 	character_matrices = []
 	character_targets = []
@@ -173,7 +173,7 @@ class neural_network_handler:
 		self.testing_mode = testing_mode
 		self.biases_for_non_input_layers = biases_for_non_input_layers
 		
-
+		self.success_records = []
 		self.populate_nn_neurons()
 		self.populate_all_weights()
 
@@ -188,9 +188,9 @@ class neural_network_handler:
 
 	def populate_all_weights(self):
 		for neuron_layer in range(1, len(self.nn_neurons)):
+			layer_length = len(self.nn_neurons[neuron_layer])
 			weight_layer = []
 			weight_changes_layer = []
-			layer_length = len(self.nn_neurons[neuron_layer])
 			for single_neuron in range(0, layer_length):
 				prev_layer_count = len(self.nn_neurons[neuron_layer-1])
 				neuron_weights = self.initilize_weights(prev_layer_count)
@@ -225,7 +225,6 @@ class neural_network_handler:
 				if(len(self.biases_weights[after_input_layer-1])!=0):
 					hidden_neuron_sum += self.biases_for_non_input_layers[after_input_layer-1] * self.biases_weights[after_input_layer-1][neuron_count]
 				self.nn_neurons[after_input_layer][neuron_count] = self.activate_threshold(hidden_neuron_sum, "sigmoid")
-				#print("act",self.nn_neurons[after_input_layer][neuron_count])
 
 
 
@@ -238,39 +237,12 @@ class neural_network_handler:
 
 	
 	testing_output_mode = False
-
-	def process_single_full_back_prop(self,input_neuron_vals, act_to_sums, prev_step_back_prop_error_vals, is_bias):
-		if(self.testing_output_mode == True):
-			print("\n\n\n\n--INNER TEST---- act_to_sum and ins")
-			pprint(act_to_sums)
-			pprint(input_neuron_vals)
-			
-		activated_to_weight = act_to_sums * input_neuron_vals
-
-		if(is_bias == True):
-			activated_to_weight = np.expand_dims(activated_to_weight, axis=1)
-
-		full_step_back_vals = prev_step_back_prop_error_vals * activated_to_weight
-
-		if(self.testing_output_mode == True):
-			print("\n\n--act_to_weight = act_to_sums * ins")
-			pprint(activated_to_weight)
-			print("\n\n---prev")
-			pprint(prev_step_back_prop_error_vals)
-
-		if(is_bias == True):
-			full_step_back_vals = full_step_back_vals.flatten()
-
-		if(self.testing_output_mode == True):
-			print("\n\n---full = act_to_weight * prev")
-			pprint(full_step_back_vals)
-		return full_step_back_vals
-
-
 	test_counter = 0
 	
 	test_print_interval = 100
 	interval_correct_count = 0
+	test_data_amount = 10000
+	
 	def back_propagate(self, target_val):
 		
 		if(len(self.nn_neurons[-1])>1 and type(target_val) is int):
@@ -289,54 +261,32 @@ class neural_network_handler:
 			print(self.test_counter)
 			#print(target_vector)
 			#print(self.nn_neurons[-1])
+			if(self.test_counter >= len(self.matrix_data)-self.test_data_amount):
+				self.success_records.append(self.interval_correct_count)
 			print(str(self.interval_correct_count)+"%")
 			self.interval_correct_count = 0
 			print("")
 
-		if(self.testing_output_mode == True):
-			print("\n\n\n\n\n---nn states---")
-			pprint(self.nn_neurons)
-			print("\n\n output vets--")
-			pprint(target_vector)
-			print("\n\n--weights--")
-			pprint(self.all_weights)
-		
-
 		for weight_layer_count in range(len(self.all_weights)-1,-1,-1):
-			weight_neuron_vals = self.nn_neurons[weight_layer_count+1]
+			weight_neuron_vals = np.expand_dims(self.nn_neurons[weight_layer_count+1],axis=1)
+			target_vector = np.expand_dims(target_vector,axis=1)
 			activated_to_sum_step = weight_neuron_vals * (1-weight_neuron_vals)
-
-			activated_to_sum_step_for_all_inputs = np.tile(activated_to_sum_step,(len(self.nn_neurons[weight_layer_count]),1)).transpose()
-			activated_to_sum_step_for_bias_input = activated_to_sum_step.transpose()
 			if(weight_layer_count == len(self.all_weights)-1):
-				prev_step_back_prop_error_vals = weight_neuron_vals - target_vector
-				prev_step_back_prop_error_vals = np.expand_dims(prev_step_back_prop_error_vals, axis=1)
+				back_prop_cost_to_sum = (weight_neuron_vals - target_vector) * activated_to_sum_step
 			else:
-				prev_step_back_prop_error_vals = self.weight_changes[weight_layer_count+1].transpose().sum(axis=1, keepdims=True)
-			input_neuron_vals = np.tile(self.nn_neurons[weight_layer_count], (len(self.nn_neurons[weight_layer_count+1]),1))
-
-			full_step_back_vals = self.process_single_full_back_prop(input_neuron_vals, activated_to_sum_step_for_all_inputs, prev_step_back_prop_error_vals, False)
-			self.weight_changes[weight_layer_count] = full_step_back_vals
+				back_prop_cost_to_sum = np.dot(np.asarray(self.all_weights[weight_layer_count+1]).transpose(),back_prop_cost_to_sum) * activated_to_sum_step
+			input_neuron_vals = np.expand_dims(self.nn_neurons[weight_layer_count],axis=1)
+			full_back_prop_sum_to_input = np.dot(back_prop_cost_to_sum,input_neuron_vals.transpose())
 			current_weight_vals = self.all_weights[weight_layer_count]
-
-			new_weight_vals = current_weight_vals - (self.learning_constant * full_step_back_vals)
+			new_weight_vals = current_weight_vals - (self.learning_constant * full_back_prop_sum_to_input)
 			self.all_weights[weight_layer_count] = new_weight_vals
 
-			if(len(self.biases_weights[weight_layer_count])>0):
-				current_bias_weight_vals = self.biases_weights[weight_layer_count]
-				full_step_back_for_bias_weight = self.process_single_full_back_prop(self.biases_for_non_input_layers[weight_layer_count], activated_to_sum_step_for_bias_input, prev_step_back_prop_error_vals, True)
-				self.biases_weight_changes[weight_layer_count] = full_step_back_for_bias_weight
-				new_bias_weight_vals = current_bias_weight_vals - (self.learning_constant * full_step_back_for_bias_weight)
-				self.biases_weights[weight_layer_count] = new_bias_weight_vals
 	
 		self.test_counter += 1
-		if(self.testing_output_mode == True):
-			print("\n\n -- w changes --")
-			pprint(self.weight_changes)
-			pprint(self.nn_neurons)
+
 
 	def learn_analyse_iteration(self):
-		repeat_count = 20
+		repeat_count = 1
 		if(self.testing_mode == True):
 			repeat_count = 5000
 		for i in range(0,repeat_count):
@@ -347,6 +297,9 @@ class neural_network_handler:
 				self.back_propagate(target_val)
 				
 				matrix_count += 1
+
+		av = sum(self.success_records)/len(self.success_records)
+		print("AV SUCCESS RATE:"+str(av)+"%")
 
 
 	#activation function for thresholding given values 
@@ -374,7 +327,7 @@ def main():
 	testing_mode = False
 	if(testing_mode == True):
 		input_neuron_count = 2
-		hidden_layers = [5] 
+		hidden_layers = [4] 
 		output_neuron_count = 1
 		matrix_data = [[1,1],[0,1],[1,0],[0,0]]
 		matrix_targets = [[1],[0],[0],[1]]
@@ -385,7 +338,7 @@ def main():
 		character_matrix_data.populate_character_matrices()
 		input_neuron_count = character_matrix_data_handler.matrix_width * character_matrix_data_handler.matrix_width
 		hidden_layers = [50]
-		biases_for_non_input_layers = [0.5,0.5]
+		biases_for_non_input_layers = [1,1]
 		matrix_data = character_matrix_data.character_matrices
 		matrix_targets = character_matrix_data.character_targets
 		output_neuron_count = 10
