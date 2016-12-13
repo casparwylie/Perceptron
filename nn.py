@@ -24,7 +24,7 @@ class data_preprocessor_handler:
 
 class character_matrix_data_handler:
 	matrix_width = 28
-	characters_to_retreive = 40000
+	characters_to_retreive = 10
 	data_set = open('newdataset.txt', 'r').read().split(",")
 	character_matrices = []
 	character_targets = []
@@ -45,35 +45,58 @@ class character_matrix_data_handler:
 
 class user_interface_handler:
 
-	frame_height = 200
-	frame_width = 500
+	frame_height = 800
+	frame_width = 1200
 
 	def __init__(self, tk_main, neural_network):
 		self.tk_main = tk_main
 		self.ui_frame = Frame(self.tk_main)
 		self.tk_main.title("Neural Network Constructor")
-		self.ui_frame.pack()
+		self.ui_frame.grid()
 		self.neural_network = neural_network
 		self.tk_main.minsize(width=self.frame_width, height=self.frame_height)
  		self.tk_main.maxsize(width=self.frame_width, height=self.frame_height)
- 		self.quit_opt = Button(self.ui_frame, text="QUIT", fg="red", command=self.ui_frame.quit)
- 		self.quit_opt.pack()
+ 
  		self.render_ui_widgets()
+ 		self.render_neural_net_visualization()
 
  	def render_ui_widgets(self):
- 		start_learning_opt = Button(self.ui_frame, text="START LEARNING", command=self.neural_network.learn_analyse_iteration)
- 		start_learning_opt.pack()
+	 		
+	 	min_x_pos = 110
+ 		min_y_pos = 10
+ 		option_width = 30
+ 		x_center_pos = (self.frame_width/2) - option_width/2
+ 		option_height = 30
+ 		max_col,max_row = self.ui_frame.grid_size()
 
- 		show_visual_nn_opt = Button(self.ui_frame, text="SEE NETWORK VISUALIZATION", command=self.render_neural_net_visualization)
- 		show_visual_nn_opt.pack()
+ 		def render_option(text, command,pos):
+ 			option = Button(self.ui_frame, text=text, command=command)
+ 			#option.place(x=pos["row"],  y=pos["col"])
+ 			return option
+
+ 		def render_input_field(default_value, label_text, pos,width):
+ 			text_input = Entry(self.ui_frame, width=width)
+ 			text_input.insert(0,str(default_value))
+ 			text_input.place(x=pos["row"], y=pos["col"])
+ 			input_label = Label(self.ui_frame, text=label_text+": ")
+ 			input_label.place(x=pos["row"], y=pos["col"]-1)
+ 			return text_input
+
+
+ 		start_learning_opt = render_option("START LEARNING", self.neural_network.learn_analyse_iteration,{"row": 40, "col":0})
+ 		show_visual_nn_opt = render_option("NETWORK VISUALIZATION", self.render_neural_net_visualization, {"row":2, "col":5})
+
+ 		learning_rate_input_label = render_input_field("0.5", "Learning Rate", {"row": 5,"col":1},10)
+ 		learning_rate_input_label = render_input_field("30,30", "Hidden Layers", {"row": 6,"col":1},4)
+
 
 	def render_neural_net_visualization(self):
-		canvas_height = 700
-		canvas_width = 1300
-		self.ui_nn_frame = Toplevel(self.tk_main)
-		self.ui_nn_frame.title("Neural Network Visualization")
-		tk_nn_visual_canvas = Canvas(self.ui_nn_frame, width=canvas_width, height=canvas_height,background="grey")
-		tk_nn_visual_canvas.pack()
+		canvas_height = 500
+		canvas_width = 1100
+		#self.ui_nn_frame = Toplevel(self.tk_main)
+		#self.ui_nn_frame.title("Neural Network Visualization")
+		tk_nn_visual_canvas = Canvas(self.ui_frame, width=canvas_width, height=canvas_height,background="grey")
+		tk_nn_visual_canvas.place(x=100, y=1)
 		nn_neurons = self.neural_network.nn_neurons
 		biases_for_non_input_layers = self.neural_network.biases_for_non_input_layers
 
@@ -238,12 +261,11 @@ class neural_network_handler:
 	
 	testing_output_mode = False
 	test_counter = 0
-	
-	test_print_interval = 100
-	interval_correct_count = 0
+	repeat_count = 50
+	correct_count = 0
 	test_data_amount = 10000
 	
-	def back_propagate(self, target_val):
+	def back_propagate(self, target_val,repeat_count):
 		
 		if(len(self.nn_neurons[-1])>1 and type(target_val) is int):
 			target_vector = self.populate_target_vector(target_val)
@@ -253,19 +275,12 @@ class neural_network_handler:
 
 		
 		outputs_as_list = self.nn_neurons[-1].tolist()
-		if(outputs_as_list.index(max(outputs_as_list))==target_val):
-			self.interval_correct_count += 1
 
+		if(self.test_counter >= len(self.matrix_data)-self.test_data_amount):
 
-		if(self.test_counter % self.test_print_interval == 0):
-			print(self.test_counter)
-			#print(target_vector)
-			#print(self.nn_neurons[-1])
-			if(self.test_counter >= len(self.matrix_data)-self.test_data_amount):
-				self.success_records.append(self.interval_correct_count)
-			print(str(self.interval_correct_count)+"%")
-			self.interval_correct_count = 0
-			print("")
+			if(outputs_as_list.index(max(outputs_as_list))==target_val):
+
+				self.correct_count += 1
 
 		for weight_layer_count in range(len(self.all_weights)-1,-1,-1):
 			weight_neuron_vals = np.expand_dims(self.nn_neurons[weight_layer_count+1],axis=1)
@@ -280,27 +295,26 @@ class neural_network_handler:
 			current_weight_vals = self.all_weights[weight_layer_count]
 			new_weight_vals = current_weight_vals - (self.learning_constant * full_back_prop_sum_to_input)
 			self.all_weights[weight_layer_count] = new_weight_vals
-
 	
 		self.test_counter += 1
 
 
 	def learn_analyse_iteration(self):
-		repeat_count = 1
+		
 		if(self.testing_mode == True):
-			repeat_count = 5000
-		for i in range(0,repeat_count):
+			self.repeat_count = 5000
+		for i in range(0,self.repeat_count):
 			matrix_count = 0
 			for matrix in self.matrix_data:
 				target_val = self.matrix_targets[matrix_count]
 				self.feed_forward(matrix)
-				self.back_propagate(target_val)
-				
+				self.back_propagate(target_val,i)
 				matrix_count += 1
-
-		av = sum(self.success_records)/len(self.success_records)
-		print("AV SUCCESS RATE:"+str(av)+"%")
-
+			
+			success_p = (float(self.correct_count)/float(self.test_data_amount))*100
+			print("Epoch " + str(i) + ", " + "AV SUCCESS RATE:"+str(success_p)+"%")
+			self.test_counter = 0
+			self.correct_count = 0
 
 	#activation function for thresholding given values 
 	def activate_threshold(self,value, type):
@@ -337,8 +351,8 @@ def main():
 		character_matrix_data = character_matrix_data_handler()
 		character_matrix_data.populate_character_matrices()
 		input_neuron_count = character_matrix_data_handler.matrix_width * character_matrix_data_handler.matrix_width
-		hidden_layers = [50]
-		biases_for_non_input_layers = [1,1]
+		hidden_layers = [70]
+		biases_for_non_input_layers = [0,0]
 		matrix_data = character_matrix_data.character_matrices
 		matrix_targets = character_matrix_data.character_targets
 		output_neuron_count = 10
