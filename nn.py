@@ -5,7 +5,9 @@ import numpy as np
 import random
 import math
 from pprint import pprint
+import time
 from Tkinter import *
+import tkMessageBox
 from decimal import *
 import os
 
@@ -22,25 +24,28 @@ class data_preprocessor_handler:
 '''
 
 
-class character_matrix_data_handler:
-	matrix_width = 28
-	characters_to_retreive = 10
-	data_set = open('newdataset.txt', 'r').read().split(",")
-	character_matrices = []
-	character_targets = []
+class matrix_data_loader_handler:
 
-	def populate_character_matrices(self):
+	def __init__(self, matrix_dims, to_retreive, file_name):
+		self.matrix_width = matrix_dims[0]
+		self.matrix_height = matrix_dims[1]
+		self.to_retreive = 25000
+		self.data_set = open(file_name, 'r').read().split(",")
+		self.matrices = []
+		self.targets = []
+
+	def populate_matrices(self):
 		px_count = 0
-		for i in range(self.characters_to_retreive):
-			matrix = np.zeros((self.matrix_width,self.matrix_width), dtype=np.float32)
+		for i in range(self.to_retreive):
+			matrix = np.zeros((self.matrix_width,self.matrix_height), dtype=np.float32)
 			for px_col in range(self.matrix_width):
-				for px_row in range(self.matrix_width):
-					if(px_count%(self.matrix_width**2)==0):
-						self.character_targets.append(int(self.data_set[px_count]))
+				for px_row in range(self.matrix_height):
+					if(px_count%(self.matrix_width*self.matrix_height)==0):
+						self.targets.append(int(self.data_set[px_count]))
 					else:
 						matrix[px_col][px_row] = float(self.data_set[px_count]) / 255.0
 					px_count += 1
-			self.character_matrices.append(matrix)
+			self.matrices.append(matrix)
 
 
 class user_interface_handler:
@@ -48,126 +53,259 @@ class user_interface_handler:
 	frame_height = 800
 	frame_width = 1200
 
-	def __init__(self, tk_main, neural_network):
+	def __init__(self, tk_main):
 		self.tk_main = tk_main
 		self.ui_frame = Frame(self.tk_main)
-		self.tk_main.title("Neural Network Constructor")
-		self.ui_frame.grid()
-		self.neural_network = neural_network
+		self.ui_frame.pack()
+		self.tk_main.title("BrainBuilder")
 		self.tk_main.minsize(width=self.frame_width, height=self.frame_height)
  		self.tk_main.maxsize(width=self.frame_width, height=self.frame_height)
- 
- 		self.render_ui_widgets()
- 		self.render_neural_net_visualization()
+ 		self.font_face = "Helvetica"
+ 		self.main_font_size = 13
+ 		
+ 		self.canvas_height = 500
+		self.canvas_width = 950
+ 		self.tk_nn_visual_canvas = Canvas(self.ui_frame, width=self.canvas_width, height=self.canvas_height,background="grey")
+		self.tk_nn_visual_canvas.pack(side=RIGHT)
+		self.canvas_labels = []
+		self.render_ui_widgets()
+		
+
 
  	def render_ui_widgets(self):
-	 		
-	 	min_x_pos = 110
- 		min_y_pos = 10
- 		option_width = 30
- 		x_center_pos = (self.frame_width/2) - option_width/2
- 		option_height = 30
- 		max_col,max_row = self.ui_frame.grid_size()
 
- 		def render_option(text, command,pos):
- 			option = Button(self.ui_frame, text=text, command=command)
- 			#option.place(x=pos["row"],  y=pos["col"])
+ 		default_hidden_layers_str = "30,30"
+ 		default_bias_str = "0,0,0"
+ 		default_input_dims = "28,28"
+	 		
+	 	input_text_length = 8
+ 		learn_options_frame = Frame(self.ui_frame,width=500,height=200)
+ 		learn_options_frame.pack(fill=BOTH,side=LEFT)
+
+ 		def render_option(text, command,parent_frame):
+ 			option = Button(parent_frame, text=text, command=command)
+ 			option.pack()
  			return option
 
- 		def render_input_field(default_value, label_text, pos,width):
- 			text_input = Entry(self.ui_frame, width=width)
+ 		def render_nn_vis_trigger(event=None):
+ 
+ 			if(event==None):
+ 				hidden_str = default_hidden_layers_str
+ 				bias_str = default_bias_str
+ 				input_dims = default_input_dims
+ 			else:
+ 				hidden_str = self.hidden_layer_input_label.get()
+ 				bias_str = self.bias_vals_input_label.get()
+ 				input_dims = self.matrix_dim_input_label.get()
+
+
+ 			if(self.check_str_list_valid(hidden_str+bias_str) == True and hidden_str != "" and bias_str != "" and input_dims != ""):
+ 				if(hidden_str[-1]==","):
+ 					hidden_str = hidden_str[0:-1]
+ 				if(bias_str[-1]==","):
+ 					bias_str = bias_str[0:-1]
+ 				if(input_dims[-1]==","):
+ 					input_dims = input_dims[0:-1]
+ 				if(self.check_str_list_valid(input_dims) == True):
+ 					input_dims = input_dims.split(",")
+
+ 					inputs_total = int(input_dims[0])
+ 					if(len(input_dims)==2): inputs_total = inputs_total * int(input_dims[1])
+	 				layers = [inputs_total]
+		 			hidden_layers = hidden_str.split(",")
+		 			layers.extend(hidden_layers)
+		 			biases = bias_str.split(",")
+		 			layers.append(10)
+		 			layers = map(int,layers)
+		 			biases = map(int,biases)
+					
+					if(len(layers) > 0 and len(biases) > 0):
+		 				self.render_neural_net_visualization(layers,biases)
+
+ 		def render_input_field(default_value, label_text,desc_text,width,parent_frame,command=None):
+ 			widget_frame = Frame(parent_frame)
+ 			widget_frame.pack(fill=X,expand=False)
+ 			desc_frame = Frame(widget_frame, width=50)
+ 			desc_frame.pack(side=BOTTOM,expand=False)
+ 			text_input = Entry(widget_frame, width=width)
+ 			text_input.bind("<KeyRelease>", render_nn_vis_trigger)
  			text_input.insert(0,str(default_value))
- 			text_input.place(x=pos["row"], y=pos["col"])
- 			input_label = Label(self.ui_frame, text=label_text+": ")
- 			input_label.place(x=pos["row"], y=pos["col"]-1)
+ 			text_input.pack(side=RIGHT)
+ 			input_label = Label(widget_frame, text=label_text+": ",font=(self.font_face, self.main_font_size))
+ 			input_label.pack(side=LEFT)
+ 			label_desc = Label(desc_frame, text="*"+desc_text, font=(self.font_face, 10), fg="#60606b",wraplength=210)
+ 			label_desc.pack(side=BOTTOM)
  			return text_input
 
+ 		
+ 		#show_visual_nn_opt = render_option("NETWORK VISUALIZATION", self.render_neural_net_visualization, self.ui_frame)
+ 		render_nn_vis_trigger()
 
- 		start_learning_opt = render_option("START LEARNING", self.neural_network.learn_analyse_iteration,{"row": 40, "col":0})
- 		show_visual_nn_opt = render_option("NETWORK VISUALIZATION", self.render_neural_net_visualization, {"row":2, "col":5})
+ 		self.data_set_name_input_label = render_input_field("newdataset.txt", "Dataset file","Save a text file into the current directory and enter name here",input_text_length,learn_options_frame)
+ 		self.matrix_dim_input_label = render_input_field("28,28", "Matrix Dimensions","Enter height, width of matrix",input_text_length,learn_options_frame,command=render_nn_vis_trigger)
+ 		self.data_to_retrieve_input_label = render_input_field("25000", "Data To Use","Enter 'all' or number",input_text_length,learn_options_frame)
+ 		self.learning_rate_input_label = render_input_field("0.5", "Learning Rate","Enter decimal or integer",input_text_length,learn_options_frame)
+ 		self.hidden_layer_input_label = render_input_field(default_hidden_layers_str, "Hidden Layers", "Enter comma seperated list of layer sizes",input_text_length, learn_options_frame,command=render_nn_vis_trigger)
+ 		self.bias_vals_input_label = render_input_field(default_bias_str, "Bias Values", "List must match hidden layer count plus output, but enter 0 for no bias",input_text_length,learn_options_frame,command=render_nn_vis_trigger)
+ 		self.weight_range_input_label = render_input_field("-1,1", "Weight Ranges","Enter one value (or two for a range) for initial weight values",input_text_length, learn_options_frame)
+ 		self.batch_size_input_label = render_input_field("1000", "Mini Batch Size","Must be less than training data size",input_text_length, learn_options_frame)
+ 		self.epochs_input_label = render_input_field("10", "Epochs","Total number of iterations",input_text_length, learn_options_frame)
+ 		self.test_data_partition_input_label = render_input_field("2000", "Data for Testing","Amount of data to partition from dataset for result testing",input_text_length, learn_options_frame)
+ 		self.start_learning_opt = render_option("START LEARNING", self.start_learning_trigger, learn_options_frame)
 
- 		learning_rate_input_label = render_input_field("0.5", "Learning Rate", {"row": 5,"col":1},10)
- 		learning_rate_input_label = render_input_field("30,30", "Hidden Layers", {"row": 6,"col":1},4)
+ 	def check_str_list_valid(self,string):
+ 		valid_str_entry = True
+ 		for char in string:
+ 			if(char!="," and char.isdigit==False):
+ 				valid_str_entry = False
+ 				break
+
+ 		return valid_str_entry
+
+ 	def start_learning_trigger(self):
+ 		hidden_str = self.hidden_layer_input_label.get()
+ 		bias_str = self.bias_vals_input_label.get()
+ 		error = ""
+
+ 		if(self.check_str_list_valid(hidden_str+bias_str) == False or hidden_str == "" or bias_str == ""):
+ 			error = "You hidden layers or bias values are invalid"
+ 		else:
+ 			hidden_layers = map(int,hidden_str.split(","))
+	 		biases_for_non_input_layers = map(int,bias_str.split(","))
+	 		if(len(hidden_layers)+1 != len(biases_for_non_input_layers)):
+	 			error = "Bias count must be equal to "+str(len(hidden_layers)+1)+" (the total layer count expect input)"
+
+ 		learning_constant = self.learning_rate_input_label.get()
+ 		if(learning_constant.replace(".", "", 1).isdigit() == False):
+ 			error = "Invalid learning constant"
+ 		else:
+ 			learning_constant = float(learning_constant)
+
+ 		data_file_name = self.data_set_name_input_label.get()
+ 		matrix_dims_str = self.matrix_dim_input_label.get()
+ 		to_retreive = self.data_to_retrieve_input_label.get()
+
+ 		if(self.check_str_list_valid(matrix_dims_str)==False):
+ 			error = "Invalid matrix dimensions"
+ 		else:
+ 			matrix_dims = map(int,matrix_dims_str.split(","))
+
+ 		if(to_retreive.isdigit() == False):
+ 			error = "Invalid matrices to use count"
+ 		else:
+ 			to_retreive = int(to_retreive)
+
+ 		if(error == ""):
+		 	testing_mode = False
+			if(testing_mode == True):
+				input_neuron_count = 2
+				output_neuron_count = 1
+				matrix_data = [[1,1],[0,1],[1,0],[0,0]]
+				matrix_targets = [[1],[0],[0],[1]]
+
+			else:
+				matrix_data_loader = matrix_data_loader_handler(matrix_dims,to_retreive,data_file_name)
+				matrix_data_loader.populate_matrices()
+				input_neuron_count = matrix_data_loader.matrix_width * matrix_data_loader.matrix_height
+				matrix_data = matrix_data_loader.matrices
+				matrix_targets = matrix_data_loader.targets
+				output_neuron_count = 10
+	 			self.neural_network = neural_network_handler()
 
 
-	def render_neural_net_visualization(self):
-		canvas_height = 500
-		canvas_width = 1100
-		#self.ui_nn_frame = Toplevel(self.tk_main)
-		#self.ui_nn_frame.title("Neural Network Visualization")
-		tk_nn_visual_canvas = Canvas(self.ui_frame, width=canvas_width, height=canvas_height,background="grey")
-		tk_nn_visual_canvas.place(x=100, y=1)
-		nn_neurons = self.neural_network.nn_neurons
-		biases_for_non_input_layers = self.neural_network.biases_for_non_input_layers
+	 		self.neural_network.initilize_nn(hidden_layers,
+		 			input_neuron_count, output_neuron_count, matrix_data,matrix_targets,
+		  			biases_for_non_input_layers, learning_constant, testing_mode)
+	 		self.neural_network.train()
+	 	else:
+	 		tkMessageBox.showinfo("Error", error)
 
-		example_p_limit_count = 25 #zero for all
 
-		highest_layer_count = max([len(neurons) for neurons in nn_neurons])
+	def render_neural_net_visualization(self,layers,biases):
+		self.tk_nn_visual_canvas.delete("all")
+		for old_labels in self.canvas_labels:
+			old_labels.destroy()
+
+		example_p_limit_count = 30 #zero for all
+		highest_layer_count = max(layers)
 		if(highest_layer_count > example_p_limit_count):
 			highest_layer_count = example_p_limit_count
 
 		highest_layer_height = 0
 
+		if(len(layers)-1 != len(biases)):
+			diff_b_layers = len(layers)-1 - len(biases)
+			if(diff_b_layers < 0):
+				biases = biases[0:diff_b_layers]
+			else:
+				for i in range(diff_b_layers):
+					biases.append(0)
+
 		neuron_padding = 5		
-		neuron_radius = ((canvas_height / highest_layer_count)/2)-neuron_padding
-		if(neuron_radius > 30): neuron_radius = 30
-		neuron_x = neuron_radius + 10
-		neuron_dist_x = (canvas_width / (len(nn_neurons)-1)) - neuron_x
+		neuron_radius = int((((self.canvas_height / highest_layer_count)/2)-neuron_padding)*1.4)
+		if(neuron_radius > 20): neuron_radius = 20
+		neuron_x = neuron_radius + 20
+		neuron_dist_x = (self.canvas_width / (len(layers)-1)) - neuron_x*2
 		neuron_color = "blue"
 
 		bias_pos_diff_x = 50
-		bias_pos_diff_y = 30
+		bias_pos_diff_y = 50
 		bias_color = "green"
 		bias_pos_y = neuron_radius*2
+
 
 		def get_layer_height_px(layer_count):
 			return (layer_count*(neuron_radius*2 + neuron_padding))
 
-		for neuron_layer in range(0,len(nn_neurons)):
-			length_of_layer = len(nn_neurons[neuron_layer])
+		for neuron_layer in range(0,len(layers)):
+			length_of_layer = layers[neuron_layer]
 			if(example_p_limit_count > 0 and example_p_limit_count < length_of_layer):
 				length_of_layer = example_p_limit_count
 			curr_layer_height = get_layer_height_px(length_of_layer)
 			if(curr_layer_height > highest_layer_height):
 				highest_layer_height = curr_layer_height
 
-		
-
-		for neuron_layer in range(0,len(nn_neurons)):
-			
-			length_of_layer = len(nn_neurons[neuron_layer])
+		for neuron_layer in range(0,len(layers)):
+			length_of_layer = layers[neuron_layer]
 			if(example_p_limit_count > 0 and example_p_limit_count < length_of_layer):
 				length_of_layer = example_p_limit_count
 
-			neuron_ystart = (canvas_height - get_layer_height_px(length_of_layer))/2
+			neuron_ystart = (neuron_radius*2)+(self.canvas_height - get_layer_height_px(length_of_layer))/2
 			neuron_y = neuron_ystart
-			layer_has_bias = ((neuron_layer > 0) and (biases_for_non_input_layers[neuron_layer-1] != 0))
+			layer_has_bias = ((neuron_layer > 0) and (biases[neuron_layer-1] != 0))
 			
 			if layer_has_bias == True:
-				if(biases_for_non_input_layers[neuron_layer-1] == True):
-					bias_y_pos = (canvas_height - highest_layer_height)/2 - bias_pos_diff_y
-					bias_x_pos = neuron_x-bias_pos_diff_x
-					bias_oval = tk_nn_visual_canvas.create_oval(bias_x_pos-neuron_radius,bias_y_pos-neuron_radius,bias_x_pos+neuron_radius,bias_y_pos+neuron_radius, fill=bias_color,outline=bias_color)
-					tk_nn_visual_canvas.tag_raise(bias_oval)
+				bias_y_pos = 10
+				bias_x_pos = neuron_x-bias_pos_diff_x
+				bias_oval = self.tk_nn_visual_canvas.create_oval(bias_x_pos-neuron_radius,bias_y_pos-neuron_radius,bias_x_pos+neuron_radius,bias_y_pos+neuron_radius, fill=bias_color,outline=bias_color)
+				self.tk_nn_visual_canvas.tag_raise(bias_oval)
 
 			for single_neuron in range(0,length_of_layer):
-				neuron_oval = tk_nn_visual_canvas.create_oval(neuron_x-neuron_radius,neuron_y-neuron_radius,neuron_x+neuron_radius,neuron_y+neuron_radius,fill=neuron_color,outline=neuron_color)
-				tk_nn_visual_canvas.tag_raise(neuron_oval)
+				if(single_neuron == 0):
+					real_layer_count = layers[neuron_layer]
+					extra_str_label = ""
+					if(real_layer_count > length_of_layer):
+						extra_str_label = "^\n^\n"
+					self.canvas_labels.append(Label(self.tk_nn_visual_canvas, text=extra_str_label+str(real_layer_count)))
+					self.canvas_labels[-1].place(x=neuron_x-(neuron_radius*2), y=neuron_y-(neuron_radius*3))
+
+				neuron_oval = self.tk_nn_visual_canvas.create_oval(neuron_x-neuron_radius,neuron_y-neuron_radius,neuron_x+neuron_radius,neuron_y+neuron_radius,fill=neuron_color,outline=neuron_color)
+				self.tk_nn_visual_canvas.tag_raise(neuron_oval)
 
 				if(layer_has_bias == True):
-					bias_connector = tk_nn_visual_canvas.create_line(neuron_x, neuron_y, bias_x_pos,bias_y_pos)
-					tk_nn_visual_canvas.tag_lower(bias_connector)
+					bias_connector = self.tk_nn_visual_canvas.create_line(neuron_x, neuron_y, bias_x_pos,bias_y_pos)
+					self.tk_nn_visual_canvas.tag_lower(bias_connector)
 
 				neuron_dist_y = (neuron_radius*2) + neuron_padding
-				if(neuron_layer < len(nn_neurons)-1):
-					length_of_next_layer = len(nn_neurons[neuron_layer+1])
+				if(neuron_layer < len(layers)-1):
+					length_of_next_layer = layers[neuron_layer+1]
 					if(example_p_limit_count > 0 and example_p_limit_count < length_of_next_layer):
 						length_of_next_layer = example_p_limit_count
-					neuron_y_for_line = (canvas_height - (length_of_next_layer)*(neuron_radius*2 + neuron_padding))/2
+					neuron_y_for_line = (neuron_radius*2)+(self.canvas_height - (length_of_next_layer)*(neuron_radius*2 + neuron_padding))/2
 					
 					for neuron_weights in range(0,length_of_next_layer):
-						neuron_connector = tk_nn_visual_canvas.create_line(neuron_x, neuron_y, neuron_x+neuron_dist_x, neuron_y_for_line)
-						tk_nn_visual_canvas.tag_lower(neuron_connector)
+						neuron_connector = self.tk_nn_visual_canvas.create_line(neuron_x, neuron_y, neuron_x+neuron_dist_x, neuron_y_for_line)
+						self.tk_nn_visual_canvas.tag_lower(neuron_connector)
 
 						neuron_y_for_line += neuron_dist_y
 
@@ -177,7 +315,7 @@ class user_interface_handler:
 class neural_network_handler:
 
 	#construct object to develop specific network structure
-	def __init__(self, hidden_layers,
+	def initilize_nn(self, hidden_layers,
 	 				input_count, output_count, matrix_data,matrix_targets,
 	  				biases_for_non_input_layers, learning_constant, testing_mode):
 		
@@ -299,7 +437,7 @@ class neural_network_handler:
 		self.test_counter += 1
 
 
-	def learn_analyse_iteration(self):
+	def train(self):
 		
 		if(self.testing_mode == True):
 			self.repeat_count = 5000
@@ -336,45 +474,8 @@ class neural_network_handler:
 
 
 def main():
-	
-	#neural network options
-	testing_mode = False
-	if(testing_mode == True):
-		input_neuron_count = 2
-		hidden_layers = [4] 
-		output_neuron_count = 1
-		matrix_data = [[1,1],[0,1],[1,0],[0,0]]
-		matrix_targets = [[1],[0],[0],[1]]
-		biases_for_non_input_layers = [1,1]
-
-	else:
-		character_matrix_data = character_matrix_data_handler()
-		character_matrix_data.populate_character_matrices()
-		input_neuron_count = character_matrix_data_handler.matrix_width * character_matrix_data_handler.matrix_width
-		hidden_layers = [70]
-		biases_for_non_input_layers = [0,0]
-		matrix_data = character_matrix_data.character_matrices
-		matrix_targets = character_matrix_data.character_targets
-		output_neuron_count = 10
-	
-	learning_constant = 0.5
-
-	if(len(biases_for_non_input_layers) != len(hidden_layers)+1):
-		print("bias count mismatch")
-
-	
-	neural_network = neural_network_handler(hidden_layers,										
-								input_neuron_count,
-								output_neuron_count,
-								matrix_data,
-								matrix_targets,
-								biases_for_non_input_layers,
-								learning_constant,
-								testing_mode)
-
-
 	tk_main = Tk()
-	user_interface = user_interface_handler(tk_main, neural_network)
+	user_interface = user_interface_handler(tk_main)
 	tk_main.mainloop()
 	
 main()
