@@ -1,15 +1,8 @@
 from __future__ import print_function
-import cv2
-import re
-import numpy as np
-import random
-import math
-from pprint import pprint
-import time
+import cv2,re,numpy as np,random,math,time,pprint,thread,decimal,tkMessageBox,matplotlib,os
 from Tkinter import *
-import tkMessageBox
-from decimal import *
-import os
+matplotlib.use('TkAgg')
+
 
 '''
 class data_preprocessor_handler:
@@ -26,13 +19,17 @@ class data_preprocessor_handler:
 
 class matrix_data_loader_handler:
 
-	def __init__(self, matrix_dims, to_retreive, file_name):
+	def __init__(self, matrix_dims, to_retreive, file_name,user_interface):
+		self.user_interface = user_interface
 		self.matrix_width = matrix_dims[0]
 		self.matrix_height = matrix_dims[1]
-		self.to_retreive = 25000
+		self.to_retreive = to_retreive
+		self.file_name = file_name
+		self.user_interface.print_console("Loading "+str(self.to_retreive)+" items from " + self.file_name + "...")
 		self.data_set = open(file_name, 'r').read().split(",")
 		self.matrices = []
 		self.targets = []
+
 
 	def populate_matrices(self):
 		px_count = 0
@@ -45,7 +42,10 @@ class matrix_data_loader_handler:
 					else:
 						matrix[px_col][px_row] = float(self.data_set[px_count]) / 255.0
 					px_count += 1
+			if(i%(int(self.to_retreive/5))==0):
+				self.user_interface.print_console("Loaded "+str(i)+"/"+str(self.to_retreive))
 			self.matrices.append(matrix)
+		self.user_interface.print_console("Finished loading data")
 
 
 class user_interface_handler:
@@ -57,7 +57,7 @@ class user_interface_handler:
 		self.tk_main = tk_main
 		self.ui_frame = Frame(self.tk_main)
 		self.ui_frame.pack()
-		self.tk_main.title("BrainBuilder")
+		self.tk_main.title("BrainBuilder By Caspar Wylie") 
 		self.tk_main.minsize(width=self.frame_width, height=self.frame_height)
  		self.tk_main.maxsize(width=self.frame_width, height=self.frame_height)
  		self.font_face = "Helvetica"
@@ -65,22 +65,27 @@ class user_interface_handler:
  		
  		self.canvas_height = 500
 		self.canvas_width = 950
+		self.learn_options_frame = Frame(self.ui_frame,width=500,height=200)
+ 		self.learn_options_frame.pack(fill=BOTH,side=LEFT)
+ 		self.console_frame = Frame(self.ui_frame,width=300,height=300)
+ 		self.console_frame.pack(side=BOTTOM,anchor=W,padx=3)
+ 		self.console_label_text = StringVar()
+ 		self.console_label = Label(self.console_frame,textvariable=self.console_label_text,bg="grey",justify=LEFT, font=("courier", self.main_font_size))
+ 		self.console_label.pack(anchor=W,expand=True,fill=BOTH)
  		self.tk_nn_visual_canvas = Canvas(self.ui_frame, width=self.canvas_width, height=self.canvas_height,background="grey")
 		self.tk_nn_visual_canvas.pack(side=RIGHT)
 		self.canvas_labels = []
 		self.render_ui_widgets()
-		
 
 
  	def render_ui_widgets(self):
 
- 		default_hidden_layers_str = "30,30"
- 		default_bias_str = "0,0,0"
+ 		default_hidden_layers_str = "50"
+ 		default_bias_str = "0,0"
  		default_input_dims = "28,28"
+ 		default_output_count = "10"
 	 		
 	 	input_text_length = 8
- 		learn_options_frame = Frame(self.ui_frame,width=500,height=200)
- 		learn_options_frame.pack(fill=BOTH,side=LEFT)
 
  		def render_option(text, command,parent_frame):
  			option = Button(parent_frame, text=text, command=command)
@@ -93,11 +98,16 @@ class user_interface_handler:
  				hidden_str = default_hidden_layers_str
  				bias_str = default_bias_str
  				input_dims = default_input_dims
+ 				output_count = int(default_output_count)
  			else:
  				hidden_str = self.hidden_layer_input_label.get()
  				bias_str = self.bias_vals_input_label.get()
  				input_dims = self.matrix_dim_input_label.get()
-
+ 				output_count_str = self.output_count_input_label.get()
+ 				if(output_count_str.isdigit()):
+ 					output_count = int(output_count_str)
+ 				else:
+ 					output_count = -1
 
  			if(self.check_str_list_valid(hidden_str+bias_str) == True and hidden_str != "" and bias_str != "" and input_dims != ""):
  				if(hidden_str[-1]==","):
@@ -106,7 +116,7 @@ class user_interface_handler:
  					bias_str = bias_str[0:-1]
  				if(input_dims[-1]==","):
  					input_dims = input_dims[0:-1]
- 				if(self.check_str_list_valid(input_dims) == True):
+ 				if(self.check_str_list_valid(input_dims) == True and output_count > 0):
  					input_dims = input_dims.split(",")
 
  					inputs_total = int(input_dims[0])
@@ -115,7 +125,7 @@ class user_interface_handler:
 		 			hidden_layers = hidden_str.split(",")
 		 			layers.extend(hidden_layers)
 		 			biases = bias_str.split(",")
-		 			layers.append(10)
+		 			layers.append(output_count)
 		 			layers = map(int,layers)
 		 			biases = map(int,biases)
 					
@@ -137,65 +147,110 @@ class user_interface_handler:
  			label_desc.pack(side=BOTTOM)
  			return text_input
 
- 		
  		#show_visual_nn_opt = render_option("NETWORK VISUALIZATION", self.render_neural_net_visualization, self.ui_frame)
  		render_nn_vis_trigger()
 
- 		self.data_set_name_input_label = render_input_field("newdataset.txt", "Dataset file","Save a text file into the current directory and enter name here",input_text_length,learn_options_frame)
- 		self.matrix_dim_input_label = render_input_field("28,28", "Matrix Dimensions","Enter height, width of matrix",input_text_length,learn_options_frame,command=render_nn_vis_trigger)
- 		self.data_to_retrieve_input_label = render_input_field("25000", "Data To Use","Enter 'all' or number",input_text_length,learn_options_frame)
- 		self.learning_rate_input_label = render_input_field("0.5", "Learning Rate","Enter decimal or integer",input_text_length,learn_options_frame)
- 		self.hidden_layer_input_label = render_input_field(default_hidden_layers_str, "Hidden Layers", "Enter comma seperated list of layer sizes",input_text_length, learn_options_frame,command=render_nn_vis_trigger)
- 		self.bias_vals_input_label = render_input_field(default_bias_str, "Bias Values", "List must match hidden layer count plus output, but enter 0 for no bias",input_text_length,learn_options_frame,command=render_nn_vis_trigger)
- 		self.weight_range_input_label = render_input_field("-1,1", "Weight Ranges","Enter one value (or two for a range) for initial weight values",input_text_length, learn_options_frame)
- 		self.batch_size_input_label = render_input_field("1000", "Mini Batch Size","Must be less than training data size",input_text_length, learn_options_frame)
- 		self.epochs_input_label = render_input_field("10", "Epochs","Total number of iterations",input_text_length, learn_options_frame)
- 		self.test_data_partition_input_label = render_input_field("2000", "Data for Testing","Amount of data to partition from dataset for result testing",input_text_length, learn_options_frame)
- 		self.start_learning_opt = render_option("START LEARNING", self.start_learning_trigger, learn_options_frame)
+ 		self.data_set_name_input_label = render_input_field("newdataset.txt", "Dataset file","Save a text file into the current directory and enter name here",input_text_length,self.learn_options_frame)
+ 		self.data_to_retrieve_input_label = render_input_field("25000", "Data To Use","Enter 'all' or number",input_text_length,self.learn_options_frame)
+ 		self.matrix_dim_input_label = render_input_field(default_input_dims,"Matrix Input Dimensions","Enter height, width of matrix",input_text_length,self.learn_options_frame,command=render_nn_vis_trigger)
+ 		self.output_count_input_label = render_input_field(default_output_count, "Output Count","Enter output quantity",input_text_length,self.learn_options_frame,command=render_nn_vis_trigger)
+ 		self.hidden_layer_input_label = render_input_field(default_hidden_layers_str, "Hidden Layers", "Enter comma seperated list of layer sizes",input_text_length, self.learn_options_frame,command=render_nn_vis_trigger)
+ 		self.bias_vals_input_label = render_input_field(default_bias_str, "Bias Values", "List must match hidden layer count plus output, but enter 0 for no bias",input_text_length,self.learn_options_frame,command=render_nn_vis_trigger)
+ 		self.learning_rate_input_label = render_input_field("0.5", "Learning Rate","Enter decimal or integer",input_text_length,self.learn_options_frame)
+ 		self.weight_range_input_label = render_input_field("-1,1", "Weight Ranges","Enter one value (or two for a range) for initial weight values",input_text_length, self.learn_options_frame)
+ 		self.batch_size_input_label = render_input_field("1000", "Mini Batch Size","Must be less than training data size",input_text_length, self.learn_options_frame)
+ 		self.epochs_input_label = render_input_field("10", "Epochs","Total number of iterations",input_text_length, self.learn_options_frame)
+ 		self.test_data_partition_input_label = render_input_field("2000", "Data for Testing","Amount of data to partition from dataset for result testing",input_text_length, self.learn_options_frame)
+ 		self.start_learning_opt = render_option("START LEARNING", self.start_learning_ui_request, self.learn_options_frame)
 
  	def check_str_list_valid(self,string):
  		valid_str_entry = True
  		for char in string:
- 			if(char!="," and char.isdigit==False):
+ 			if(char!="," and char.isdigit()==False):
  				valid_str_entry = False
  				break
 
  		return valid_str_entry
 
- 	def start_learning_trigger(self):
+ 	print_row = 0
+ 	def print_console(self,text):
+ 		self.print_row+=1
+ 		if(self.print_row == 20):
+ 			pre_text = ""
+ 		else:
+ 			pre_text = self.console_label_text.get() + "\n"
+ 		self.console_label_text.set(pre_text + ">>" + text)
+ 
+
+ 	def check_all_fields_valid(self):
  		hidden_str = self.hidden_layer_input_label.get()
  		bias_str = self.bias_vals_input_label.get()
  		error = ""
-
+ 		valid_values = {}
  		if(self.check_str_list_valid(hidden_str+bias_str) == False or hidden_str == "" or bias_str == ""):
  			error = "You hidden layers or bias values are invalid"
  		else:
- 			hidden_layers = map(int,hidden_str.split(","))
-	 		biases_for_non_input_layers = map(int,bias_str.split(","))
-	 		if(len(hidden_layers)+1 != len(biases_for_non_input_layers)):
-	 			error = "Bias count must be equal to "+str(len(hidden_layers)+1)+" (the total layer count expect input)"
+	 		valid_values['hidden_layers'] = map(int,hidden_str.split(","))
+	 		valid_values['biases_for_non_input_layers'] = map(int,bias_str.split(","))
 
+	 		if(len(valid_values['hidden_layers'])+1 != len(valid_values['biases_for_non_input_layers'])):
+	 			error = "Bias count must be equal to "+str(len(valid_values['hidden_layers'])+1)+" (the total layer count expect input)"
+ 		
  		learning_constant = self.learning_rate_input_label.get()
  		if(learning_constant.replace(".", "", 1).isdigit() == False):
  			error = "Invalid learning constant"
  		else:
- 			learning_constant = float(learning_constant)
-
- 		data_file_name = self.data_set_name_input_label.get()
+ 			valid_values['learning_constant'] = float(learning_constant)
+ 		valid_values['data_file_name'] = self.data_set_name_input_label.get()
  		matrix_dims_str = self.matrix_dim_input_label.get()
+ 		weight_range_str = self.weight_range_input_label.get()
  		to_retreive = self.data_to_retrieve_input_label.get()
-
+ 		output_count = self.output_count_input_label.get()
+ 		epochs = self.epochs_input_label.get()
+ 		data_to_test_count = self.test_data_partition_input_label.get()
  		if(self.check_str_list_valid(matrix_dims_str)==False):
  			error = "Invalid matrix dimensions"
  		else:
- 			matrix_dims = map(int,matrix_dims_str.split(","))
-
- 		if(to_retreive.isdigit() == False):
- 			error = "Invalid matrices to use count"
+ 			valid_values['matrix_dims'] = map(int,matrix_dims_str.split(","))
+ 		if(self.check_str_list_valid(weight_range_str.replace(".", "", 1).replace("-", "", 1))==False):
+ 			error = "Invalid weight ranges"
  		else:
- 			to_retreive = int(to_retreive)
+ 			valid_values['weight_range'] = map(float,weight_range_str.split(","))
+ 		if(to_retreive.isdigit() == False):
+ 			error = "Invalid matrices to use entry"
+ 		else:
+ 			valid_values['to_retreive'] = int(to_retreive)
+ 		if(output_count.isdigit() == False):
+ 			error = "Invalid output count"
+ 		else:
+ 			valid_values['output_count'] = int(output_count)
+ 		if(epochs.isdigit() == False):
+ 			error = "Invalid epochs entry"
+ 		else:
+ 			valid_values['epochs'] = int(epochs)
+ 		if(data_to_test_count.isdigit() == False):
+ 			error = "Invalid epochs entry"
+ 		else:
+ 			valid_values['data_to_test'] = int(data_to_test_count)
+ 			if(valid_values['data_to_test'] > valid_values['to_retreive']):
+ 				error = "Data to test amount cannot be more than all data to get"
+
+ 		valid_values['success'] = True
 
  		if(error == ""):
+ 			return valid_values
+ 		else:
+ 			response = {}
+ 			response['success'] = False
+ 			response['error'] = error
+ 			return response
+
+ 	def start_learning_ui_request(self):
+ 		thread.start_new_thread(self.start_learning_in_thread,())
+
+ 	def start_learning_in_thread(self):
+ 		field_result = self.check_all_fields_valid()
+ 		if(field_result['success'] ==True):
 		 	testing_mode = False
 			if(testing_mode == True):
 				input_neuron_count = 2
@@ -204,21 +259,21 @@ class user_interface_handler:
 				matrix_targets = [[1],[0],[0],[1]]
 
 			else:
-				matrix_data_loader = matrix_data_loader_handler(matrix_dims,to_retreive,data_file_name)
+				matrix_data_loader = matrix_data_loader_handler(field_result['matrix_dims'],field_result['to_retreive'],field_result['data_file_name'],self)
 				matrix_data_loader.populate_matrices()
 				input_neuron_count = matrix_data_loader.matrix_width * matrix_data_loader.matrix_height
 				matrix_data = matrix_data_loader.matrices
 				matrix_targets = matrix_data_loader.targets
-				output_neuron_count = 10
 	 			self.neural_network = neural_network_handler()
 
-
-	 		self.neural_network.initilize_nn(hidden_layers,
-		 			input_neuron_count, output_neuron_count, matrix_data,matrix_targets,
-		  			biases_for_non_input_layers, learning_constant, testing_mode)
+	 		self.neural_network.initilize_nn(field_result['hidden_layers'],
+		 			input_neuron_count,field_result['output_count'], matrix_data,matrix_targets,
+		  			field_result['biases_for_non_input_layers'], field_result['learning_constant'], 
+		  			testing_mode,field_result['weight_range'],field_result['epochs'],field_result['data_to_test'],
+		  			self)
 	 		self.neural_network.train()
 	 	else:
-	 		tkMessageBox.showinfo("Error", error)
+	 		tkMessageBox.showinfo("Error", field_result['error'])
 
 
 	def render_neural_net_visualization(self,layers,biases):
@@ -226,7 +281,7 @@ class user_interface_handler:
 		for old_labels in self.canvas_labels:
 			old_labels.destroy()
 
-		example_p_limit_count = 30 #zero for all
+		example_p_limit_count = 20 #zero for all
 		highest_layer_count = max(layers)
 		if(highest_layer_count > example_p_limit_count):
 			highest_layer_count = example_p_limit_count
@@ -242,8 +297,8 @@ class user_interface_handler:
 					biases.append(0)
 
 		neuron_padding = 5		
-		neuron_radius = int((((self.canvas_height / highest_layer_count)/2)-neuron_padding)*1.4)
-		if(neuron_radius > 20): neuron_radius = 20
+		neuron_radius = int((((self.canvas_height / highest_layer_count)/2)-neuron_padding))
+		if(neuron_radius > 15): neuron_radius = 15
 		neuron_x = neuron_radius + 20
 		neuron_dist_x = (self.canvas_width / (len(layers)-1)) - neuron_x*2
 		neuron_color = "blue"
@@ -270,7 +325,7 @@ class user_interface_handler:
 			if(example_p_limit_count > 0 and example_p_limit_count < length_of_layer):
 				length_of_layer = example_p_limit_count
 
-			neuron_ystart = (neuron_radius*2)+(self.canvas_height - get_layer_height_px(length_of_layer))/2
+			neuron_ystart = (self.canvas_height - get_layer_height_px(length_of_layer))/2
 			neuron_y = neuron_ystart
 			layer_has_bias = ((neuron_layer > 0) and (biases[neuron_layer-1] != 0))
 			
@@ -301,7 +356,7 @@ class user_interface_handler:
 					length_of_next_layer = layers[neuron_layer+1]
 					if(example_p_limit_count > 0 and example_p_limit_count < length_of_next_layer):
 						length_of_next_layer = example_p_limit_count
-					neuron_y_for_line = (neuron_radius*2)+(self.canvas_height - (length_of_next_layer)*(neuron_radius*2 + neuron_padding))/2
+					neuron_y_for_line = (self.canvas_height - (length_of_next_layer)*(neuron_radius*2 + neuron_padding))/2
 					
 					for neuron_weights in range(0,length_of_next_layer):
 						neuron_connector = self.tk_nn_visual_canvas.create_line(neuron_x, neuron_y, neuron_x+neuron_dist_x, neuron_y_for_line)
@@ -317,14 +372,19 @@ class neural_network_handler:
 	#construct object to develop specific network structure
 	def initilize_nn(self, hidden_layers,
 	 				input_count, output_count, matrix_data,matrix_targets,
-	  				biases_for_non_input_layers, learning_constant, testing_mode):
+	  				biases_for_non_input_layers, learning_constant,
+	  				testing_mode,weight_range,epochs,data_to_test,user_interface):
+
 		
+		self.user_interface = user_interface
+		self.user_interface.print_console("Constructing neural network")
 		self.all_weights = []
 		self.nn_neurons = []
 		self.weight_changes = []
 		self.biases_weights = []
 		self.biases_weight_changes = []
-
+		self.epochs = epochs
+		self.test_data_amount = data_to_test
 		self.matrix_data = matrix_data
 		self.hidden_layers = hidden_layers
 		self.matrix_targets = matrix_targets
@@ -333,7 +393,7 @@ class neural_network_handler:
 		self.input_count = input_count
 		self.testing_mode = testing_mode
 		self.biases_for_non_input_layers = biases_for_non_input_layers
-		
+		self.weight_range = weight_range 
 		self.success_records = []
 		self.populate_nn_neurons()
 		self.populate_all_weights()
@@ -373,9 +433,15 @@ class neural_network_handler:
 			self.biases_weights.append(single_bias_weights)
 			self.biases_weight_changes.append(single_bias_weights_change)
 
-
 	def initilize_weights(self,size):
-		return np.random.uniform(low=-1, high=1, size=(size))
+		if(len(self.weight_range)==1):
+			upper_bound = self.weight_range[0]
+			lower_bound = upper_bound
+		else:
+			upper_bound = self.weight_range[1]
+			lower_bound = self.weight_range[0]
+
+		return np.random.uniform(low=lower_bound, high=upper_bound, size=(size))
 
 	def feed_forward(self, matrix):
 		self.populate_input_layer(matrix)
@@ -388,7 +454,6 @@ class neural_network_handler:
 				self.nn_neurons[after_input_layer][neuron_count] = self.activate_threshold(hidden_neuron_sum, "sigmoid")
 
 
-
 	def populate_input_layer(self, data):
 		value_count = 0
 		if(type(data[0]) is not int):
@@ -396,12 +461,9 @@ class neural_network_handler:
 		else:
 			self.nn_neurons[0] = np.array(data)
 
-	
 	testing_output_mode = False
 	test_counter = 0
-	repeat_count = 50
 	correct_count = 0
-	test_data_amount = 10000
 	
 	def back_propagate(self, target_val,repeat_count):
 		
@@ -410,14 +472,9 @@ class neural_network_handler:
 		else:
 			target_vector = target_val
 		output_error_total = 0
-
-		
 		outputs_as_list = self.nn_neurons[-1].tolist()
-
 		if(self.test_counter >= len(self.matrix_data)-self.test_data_amount):
-
 			if(outputs_as_list.index(max(outputs_as_list))==target_val):
-
 				self.correct_count += 1
 
 		for weight_layer_count in range(len(self.all_weights)-1,-1,-1):
@@ -428,6 +485,9 @@ class neural_network_handler:
 				back_prop_cost_to_sum = (weight_neuron_vals - target_vector) * activated_to_sum_step
 			else:
 				back_prop_cost_to_sum = np.dot(np.asarray(self.all_weights[weight_layer_count+1]).transpose(),back_prop_cost_to_sum) * activated_to_sum_step
+
+			if(len(self.biases_weights[weight_layer_count])!=0):
+				self.biases_weights[weight_layer_count] = back_prop_cost_to_sum
 			input_neuron_vals = np.expand_dims(self.nn_neurons[weight_layer_count],axis=1)
 			full_back_prop_sum_to_input = np.dot(back_prop_cost_to_sum,input_neuron_vals.transpose())
 			current_weight_vals = self.all_weights[weight_layer_count]
@@ -438,19 +498,19 @@ class neural_network_handler:
 
 
 	def train(self):
-		
+		self.user_interface.print_console("**STARTING TRAINING**")
 		if(self.testing_mode == True):
 			self.repeat_count = 5000
-		for i in range(0,self.repeat_count):
+		for epoch in range(0,self.epochs):
 			matrix_count = 0
 			for matrix in self.matrix_data:
 				target_val = self.matrix_targets[matrix_count]
 				self.feed_forward(matrix)
-				self.back_propagate(target_val,i)
+				self.back_propagate(target_val,epoch)
 				matrix_count += 1
 			
 			success_p = (float(self.correct_count)/float(self.test_data_amount))*100
-			print("Epoch " + str(i) + ", " + "AV SUCCESS RATE:"+str(success_p)+"%")
+			self.user_interface.print_console("Epoch "+str(epoch+1)+":   "+str(success_p)+"% success (of "+str(self.test_data_amount)+")")
 			self.test_counter = 0
 			self.correct_count = 0
 
