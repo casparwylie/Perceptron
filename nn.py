@@ -2,6 +2,10 @@ from __future__ import print_function
 import cv2,re,numpy as np,random,math,time,pprint,thread,decimal,tkMessageBox,matplotlib,os
 from Tkinter import *
 matplotlib.use('TkAgg')
+from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg, NavigationToolbar2TkAgg
+import matplotlib.pyplot as plt
+import matplotlib.animation as animation
+from matplotlib import rcParams
 
 
 '''
@@ -25,7 +29,7 @@ class matrix_data_loader_handler:
 		self.matrix_height = matrix_dims[1]
 		self.to_retreive = to_retreive
 		self.file_name = file_name
-		self.user_interface.print_console("Loading "+str(self.to_retreive)+" items from " + self.file_name + "...")
+		self.user_interface.print_console("Loading "+str(self.to_retreive)+" items from " + self.file_name + "... \n")
 		self.data_set = open(file_name, 'r').read().split(",")
 		self.matrices = []
 		self.targets = []
@@ -45,7 +49,7 @@ class matrix_data_loader_handler:
 			if(i%(int(self.to_retreive/5))==0):
 				self.user_interface.print_console("Loaded "+str(i)+"/"+str(self.to_retreive))
 			self.matrices.append(matrix)
-		self.user_interface.print_console("Finished loading data")
+		self.user_interface.print_console("\n Finished loading data")
 
 
 class user_interface_handler:
@@ -62,21 +66,92 @@ class user_interface_handler:
  		self.tk_main.maxsize(width=self.frame_width, height=self.frame_height)
  		self.font_face = "Helvetica"
  		self.main_font_size = 13
- 		
+ 		self.tk_main.protocol('WM_DELETE_WINDOW', self.tk_main.quit)
  		self.canvas_height = 500
 		self.canvas_width = 950
-		self.learn_options_frame = Frame(self.ui_frame,width=500,height=200)
- 		self.learn_options_frame.pack(fill=BOTH,side=LEFT)
- 		self.console_frame = Frame(self.ui_frame,width=300,height=300)
- 		self.console_frame.pack(side=BOTTOM,anchor=W,padx=3)
- 		self.console_label_text = StringVar()
- 		self.console_label = Label(self.console_frame,textvariable=self.console_label_text,bg="grey",justify=LEFT, font=("courier", self.main_font_size))
- 		self.console_label.pack(anchor=W,expand=True,fill=BOTH)
- 		self.tk_nn_visual_canvas = Canvas(self.ui_frame, width=self.canvas_width, height=self.canvas_height,background="grey")
-		self.tk_nn_visual_canvas.pack(side=RIGHT)
+		
 		self.canvas_labels = []
+		self.render_ui_frames()
 		self.render_ui_widgets()
 
+
+	def render_ui_frames(self):
+
+		self.learn_options_frame = Frame(self.ui_frame,width=500)
+ 		self.learn_options_frame.pack(fill=BOTH,side=LEFT)
+ 		#self.console_frame = Frame(self.ui_frame,bg="grey",height=300,width=400)
+ 		#self.console_frame.pack()
+ 		self.c_scrollbar = Scrollbar(self.tk_main)
+		self.c_scrollbar.pack(side=RIGHT, fill=Y)
+
+		self.lower_frame = Frame(self.ui_frame)
+		self.lower_frame.pack(side=BOTTOM, fill=BOTH)
+ 		self.console_list_box = Text(self.lower_frame,bg="grey",height=19,width=25, borderwidth=0,font=("courier", 11))
+ 		self.console_list_box.pack(padx=3,ipady=10,ipadx=10,side=LEFT,fill=Y)
+ 		self.console_list_box.config(yscrollcommand=self.c_scrollbar.set)
+ 		self.console_list_box.configure(state="disabled")
+ 		self.c_scrollbar.config(command=self.console_list_box.yview)
+ 		self.tk_nn_visual_canvas = Canvas(self.ui_frame, width=self.canvas_width, height=self.canvas_height,background="grey")
+		self.tk_nn_visual_canvas.pack(side=RIGHT)
+
+
+		self.g_figures = range(2)
+		self.g_axis = range(2)
+		self.g_lines = range(2)
+		self.g_canvas = range(2)
+
+		rcParams.update({'figure.autolayout': True})
+
+		self.g_figures[0] = plt.figure()
+		self.g_axis[0] = self.g_figures[0].add_subplot(111)
+		self.g_axis[0].set_ylabel("%")
+		self.g_axis[0].set_xlabel("1000 forward feeds")
+		self.g_figures[0].suptitle("% Of Error (from 100 feedforwards)")
+		self.g_lines[0], = self.g_axis[0].plot([], [], 'r-')
+		self.g_axis[0].get_yaxis().set_visible(False)
+		self.g_axis[0].get_xaxis().set_visible(False)
+		self.g_canvas[0] = FigureCanvasTkAgg(self.g_figures[0], master=self.lower_frame)
+		self.g_canvas[0].get_tk_widget().config(width=360,height=260)
+		self.g_canvas[0].get_tk_widget().pack(side=LEFT,fill=X)
+
+
+		self.g_figures[1] =  plt.figure()
+		self.g_axis[1] = self.g_figures[1].add_subplot(141)
+		self.g_axis[1].set_ylabel("%")
+		self.g_axis[1].set_xlabel("Epochs")
+		self.g_figures[1].suptitle("% Of Success (from test data each Epoch)")
+		self.g_lines[1], = self.g_axis[1].plot([], [], 'g-')
+		self.g_axis[1].get_yaxis().set_visible(False)
+		self.g_axis[1].get_xaxis().set_visible(False)
+		self.g_canvas[1] = FigureCanvasTkAgg(self.g_figures[1], master=self.lower_frame)
+		self.g_canvas[1].get_tk_widget().config(width=360,height=260)
+		self.g_canvas[1].get_tk_widget().pack(side=LEFT,fill=X)
+
+
+	prev_line_1_data = 0
+	axis_g_showing = [False,False]
+	def animate_graph_figures(self, line,data):
+		if(self.axis_g_showing[line]==False):
+			self.g_axis[line].get_yaxis().set_visible(True)
+			self.g_axis[line].get_xaxis().set_visible(True)
+			self.axis_g_showing[line]=True
+			
+		ydata = self.g_lines[line].get_ydata()
+		ydata = np.append(ydata,data)
+		#print(ydata)
+		self.g_lines[line].set_ydata(ydata)
+		self.g_lines[line].set_xdata(range(len(ydata)))
+		self.g_axis[line].relim()
+		self.g_axis[line].autoscale_view()
+
+		if(line==1): 
+			if(data!=self.prev_line_1_data):
+				self.g_axis[line].annotate(str(data)+"%",(len(ydata)-1,data+5))
+			self.prev_line_1_data = data
+
+		self.g_figures[line].canvas.draw()
+
+		
 
  	def render_ui_widgets(self):
 
@@ -84,7 +159,6 @@ class user_interface_handler:
  		default_bias_str = "0,0"
  		default_input_dims = "28,28"
  		default_output_count = "10"
-	 		
 	 	input_text_length = 8
 
  		def render_option(text, command,parent_frame):
@@ -162,7 +236,7 @@ class user_interface_handler:
  		self.epochs_input_label = render_input_field("10", "Epochs","Total number of iterations",input_text_length, self.learn_options_frame)
  		self.test_data_partition_input_label = render_input_field("2000", "Data for Testing","Amount of data to partition from dataset for result testing",input_text_length, self.learn_options_frame)
  		self.start_learning_opt = render_option("START LEARNING", self.start_learning_ui_request, self.learn_options_frame)
-
+ 		
  	def check_str_list_valid(self,string):
  		valid_str_entry = True
  		for char in string:
@@ -172,14 +246,11 @@ class user_interface_handler:
 
  		return valid_str_entry
 
- 	print_row = 0
  	def print_console(self,text):
- 		self.print_row+=1
- 		if(self.print_row == 20):
- 			pre_text = ""
- 		else:
- 			pre_text = self.console_label_text.get() + "\n"
- 		self.console_label_text.set(pre_text + ">>" + text)
+ 		self.console_list_box.configure(state="normal")
+ 		self.console_list_box.insert(END,">>" + text + "\n")
+ 		self.console_list_box.see(END)
+ 		self.console_list_box.configure(state="disabled")
  
 
  	def check_all_fields_valid(self):
@@ -464,6 +535,10 @@ class neural_network_handler:
 	testing_output_mode = False
 	test_counter = 0
 	correct_count = 0
+	error_by_1000 = 0
+	error_by_1000_counter = 1
+
+	output_error_total = 0
 	
 	def back_propagate(self, target_val,repeat_count):
 		
@@ -471,11 +546,19 @@ class neural_network_handler:
 			target_vector = self.populate_target_vector(target_val)
 		else:
 			target_vector = target_val
-		output_error_total = 0
+		self.output_error_total = 0.5*((self.nn_neurons[-1] - target_vector)**2).sum()
+		
 		outputs_as_list = self.nn_neurons[-1].tolist()
 		if(self.test_counter >= len(self.matrix_data)-self.test_data_amount):
 			if(outputs_as_list.index(max(outputs_as_list))==target_val):
 				self.correct_count += 1
+
+		if(outputs_as_list.index(max(outputs_as_list))!=target_val):
+				self.error_by_1000  +=1
+		if(self.error_by_1000_counter % 1000 == 0):
+			self.user_interface.animate_graph_figures(0,self.error_by_1000/10)
+			self.error_by_1000 = 0
+			self.error_by_1000_counter = 0
 
 		for weight_layer_count in range(len(self.all_weights)-1,-1,-1):
 			weight_neuron_vals = np.expand_dims(self.nn_neurons[weight_layer_count+1],axis=1)
@@ -495,10 +578,12 @@ class neural_network_handler:
 			self.all_weights[weight_layer_count] = new_weight_vals
 	
 		self.test_counter += 1
+		self.error_by_1000_counter += 1
 
 
 	def train(self):
-		self.user_interface.print_console("**STARTING TRAINING**")
+		
+		self.user_interface.print_console("\n **TRAINING**")
 		if(self.testing_mode == True):
 			self.repeat_count = 5000
 		for epoch in range(0,self.epochs):
@@ -510,7 +595,8 @@ class neural_network_handler:
 				matrix_count += 1
 			
 			success_p = (float(self.correct_count)/float(self.test_data_amount))*100
-			self.user_interface.print_console("Epoch "+str(epoch+1)+":   "+str(success_p)+"% success (of "+str(self.test_data_amount)+")")
+			self.user_interface.animate_graph_figures(1,success_p)
+			self.user_interface.print_console("\n Epoch "+str(epoch+1)+":   "+str(success_p)+"% success (of "+str(self.test_data_amount)+")")
 			self.test_counter = 0
 			self.correct_count = 0
 
@@ -535,6 +621,8 @@ class neural_network_handler:
 
 def main():
 	tk_main = Tk()
+
+	
 	user_interface = user_interface_handler(tk_main)
 	tk_main.mainloop()
 	
