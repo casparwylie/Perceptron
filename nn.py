@@ -6,6 +6,7 @@ from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg, NavigationToolb
 import matplotlib.pyplot as plt
 import matplotlib.animation as animation
 from matplotlib import rcParams
+from PIL import Image, ImageTk
 
 
 '''
@@ -34,10 +35,13 @@ class matrix_data_loader_handler:
 		self.matrices = []
 		self.targets = []
 
-
 	def populate_matrices(self):
 		px_count = 0
+		done_msg = "Finished loading data \n "
 		for i in range(self.to_retreive):
+			if(self.user_interface.cancel_training == True):
+				done_msg = "**CANCELLED** \n "
+				break
 			matrix = np.zeros((self.matrix_width,self.matrix_height), dtype=np.float32)
 			for px_col in range(self.matrix_width):
 				for px_row in range(self.matrix_height):
@@ -49,7 +53,8 @@ class matrix_data_loader_handler:
 			if(i%(int(self.to_retreive/5))==0):
 				self.user_interface.print_console("Loaded "+str(i)+"/"+str(self.to_retreive))
 			self.matrices.append(matrix)
-		self.user_interface.print_console("\n Finished loading data")
+
+		self.user_interface.print_console(done_msg)
 
 
 class user_interface_handler:
@@ -69,11 +74,11 @@ class user_interface_handler:
  		self.tk_main.protocol('WM_DELETE_WINDOW', self.tk_main.quit)
  		self.canvas_height = 500
 		self.canvas_width = 950
-		
+		self.cancel_training = False
+		self.new_line_count = 0
 		self.canvas_labels = []
 		self.render_ui_frames()
 		self.render_ui_widgets()
-
 
 	def render_ui_frames(self):
 
@@ -86,49 +91,40 @@ class user_interface_handler:
 
 		self.lower_frame = Frame(self.ui_frame)
 		self.lower_frame.pack(side=BOTTOM, fill=BOTH)
- 		self.console_list_box = Text(self.lower_frame,bg="grey",height=19,width=25, borderwidth=0,font=("courier", 11))
- 		self.console_list_box.pack(padx=3,ipady=10,ipadx=10,side=LEFT,fill=Y)
+ 		self.console_list_box = Text(self.lower_frame,bg="grey",height=19,width=34,borderwidth=0, highlightthickness=0,font=("courier bold", 10))
+ 		self.console_list_box.pack(padx=3,ipady=20,ipadx=10,side=LEFT,fill=Y)
  		self.console_list_box.config(yscrollcommand=self.c_scrollbar.set)
  		self.console_list_box.configure(state="disabled")
  		self.c_scrollbar.config(command=self.console_list_box.yview)
  		self.tk_nn_visual_canvas = Canvas(self.ui_frame, width=self.canvas_width, height=self.canvas_height,background="grey")
 		self.tk_nn_visual_canvas.pack(side=RIGHT)
 
-
 		self.g_figures = range(2)
 		self.g_axis = range(2)
-		self.g_lines = range(2)
+		self.g_lines = [[0],[0]]
 		self.g_canvas = range(2)
 
 		rcParams.update({'figure.autolayout': True})
 
-		self.g_figures[0] = plt.figure()
-		self.g_axis[0] = self.g_figures[0].add_subplot(111)
-		self.g_axis[0].set_ylabel("%")
-		self.g_axis[0].set_xlabel("1000 forward feeds")
-		self.g_figures[0].suptitle("% Of Error (from 100 feedforwards)")
-		self.g_lines[0], = self.g_axis[0].plot([], [], 'r-')
-		self.g_axis[0].get_yaxis().set_visible(False)
-		self.g_axis[0].get_xaxis().set_visible(False)
-		self.g_canvas[0] = FigureCanvasTkAgg(self.g_figures[0], master=self.lower_frame)
-		self.g_canvas[0].get_tk_widget().config(width=360,height=260)
-		self.g_canvas[0].get_tk_widget().pack(side=LEFT,fill=X)
+		self.line_colors = ["blue","green","red","magneta","cyan","yellow"]
+		self.render_graph("% Of Error (from 1000 feedforwards)","1000 forward feeds","%",0,"r")
+		self.render_graph("% Of Success (from test data each Epoch)","Epoch","%",1,"b")
+		self.prepare_new_line_graph()
 
+	def render_graph(self,title,xlabel,ylabel,line_num,col):
 
-		self.g_figures[1] =  plt.figure()
-		self.g_axis[1] = self.g_figures[1].add_subplot(141)
-		self.g_axis[1].set_ylabel("%")
-		self.g_axis[1].set_xlabel("Epochs")
-		self.g_figures[1].suptitle("% Of Success (from test data each Epoch)")
-		self.g_lines[1], = self.g_axis[1].plot([], [], 'g-')
-		self.g_axis[1].get_yaxis().set_visible(False)
-		self.g_axis[1].get_xaxis().set_visible(False)
-		self.g_canvas[1] = FigureCanvasTkAgg(self.g_figures[1], master=self.lower_frame)
-		self.g_canvas[1].get_tk_widget().config(width=360,height=260)
-		self.g_canvas[1].get_tk_widget().pack(side=LEFT,fill=X)
+		self.g_figures[line_num] =  plt.figure()
+		self.g_axis[line_num] = self.g_figures[line_num].add_subplot(111)
+		self.g_axis[line_num].set_ylabel(ylabel)
+		self.g_axis[line_num].set_xlabel(xlabel)
+		self.g_figures[line_num].suptitle(title)
+		self.g_axis[line_num].get_yaxis().set_visible(False)
+		self.g_axis[line_num].get_xaxis().set_visible(False)
+		self.g_canvas[line_num] = FigureCanvasTkAgg(self.g_figures[line_num], master=self.lower_frame)
+		self.g_canvas[line_num].get_tk_widget().config(width=360,height=280)
+		self.g_canvas[line_num].get_tk_widget().pack(side=LEFT,fill=X)
 
-
-	prev_line_1_data = 0
+	prev_line_1_data = 0.0
 	axis_g_showing = [False,False]
 	def animate_graph_figures(self, line,data):
 		if(self.axis_g_showing[line]==False):
@@ -136,22 +132,26 @@ class user_interface_handler:
 			self.g_axis[line].get_xaxis().set_visible(True)
 			self.axis_g_showing[line]=True
 			
-		ydata = self.g_lines[line].get_ydata()
+		ydata = self.g_lines[line][-1].get_ydata()
 		ydata = np.append(ydata,data)
 		#print(ydata)
-		self.g_lines[line].set_ydata(ydata)
-		self.g_lines[line].set_xdata(range(len(ydata)))
+		self.g_lines[line][-1].set_ydata(ydata)
+		self.g_lines[line][-1].set_xdata(range(len(ydata)))
 		self.g_axis[line].relim()
 		self.g_axis[line].autoscale_view()
 
 		if(line==1): 
 			if(data!=self.prev_line_1_data):
-				self.g_axis[line].annotate(str(data)+"%",(len(ydata)-1,data+5))
+				self.g_axis[line].annotate(str(data)+"%",(len(ydata)-1,data))
 			self.prev_line_1_data = data
 
 		self.g_figures[line].canvas.draw()
 
-		
+	def prepare_new_line_graph(self):
+		for line in range(2):
+			new_line, = self.g_axis[line].plot([], [], self.line_colors[self.new_line_count][0:1]+"-")
+			self.g_lines[line].append(new_line)
+		self.new_line_count += 1
 
  	def render_ui_widgets(self):
 
@@ -167,7 +167,6 @@ class user_interface_handler:
  			return option
 
  		def render_nn_vis_trigger(event=None):
- 
  			if(event==None):
  				hidden_str = default_hidden_layers_str
  				bias_str = default_bias_str
@@ -232,11 +231,14 @@ class user_interface_handler:
  		self.bias_vals_input_label = render_input_field(default_bias_str, "Bias Values", "List must match hidden layer count plus output, but enter 0 for no bias",input_text_length,self.learn_options_frame,command=render_nn_vis_trigger)
  		self.learning_rate_input_label = render_input_field("0.5", "Learning Rate","Enter decimal or integer",input_text_length,self.learn_options_frame)
  		self.weight_range_input_label = render_input_field("-1,1", "Weight Ranges","Enter one value (or two for a range) for initial weight values",input_text_length, self.learn_options_frame)
- 		self.batch_size_input_label = render_input_field("1000", "Mini Batch Size","Must be less than training data size",input_text_length, self.learn_options_frame)
  		self.epochs_input_label = render_input_field("10", "Epochs","Total number of iterations",input_text_length, self.learn_options_frame)
  		self.test_data_partition_input_label = render_input_field("2000", "Data for Testing","Amount of data to partition from dataset for result testing",input_text_length, self.learn_options_frame)
  		self.start_learning_opt = render_option("START LEARNING", self.start_learning_ui_request, self.learn_options_frame)
- 		
+ 		self.cancel_learning_opt = render_option("CANCEL", self.cancel_learning, self.learn_options_frame)
+ 		self.cancel_learning_opt.config(state="disabled")
+ 		self.render_cam_opt = render_option("TEST WITH CAM", self.render_camera, self.learn_options_frame)
+ 		self.render_cam_opt.config(state="disabled")
+ 	
  	def check_str_list_valid(self,string):
  		valid_str_entry = True
  		for char in string:
@@ -246,8 +248,65 @@ class user_interface_handler:
 
  		return valid_str_entry
 
+ 	prev_guess = -1
+ 	def render_camera(self):
+ 		camera_window = Toplevel(self.tk_main)
+ 		image_frame = Frame(camera_window, width=600, height=500)
+		image_frame.pack()
+		capture_frame = cv2.VideoCapture(0)
+		label_for_cam = Label(image_frame)
+		label_for_cam.pack(expand=True)
+		label_for_minicam = Label(image_frame)
+		label_for_minicam.pack(side=LEFT)
+		def render_cam_frame():
+			_, cv_frame = capture_frame.read()
+			#cv_frame = cv2.flip(cv_frame, 1)
+			cv_frame = cv2.cvtColor(cv_frame, cv2.COLOR_BGR2GRAY)
+
+			roi_size = 50
+			roi_point_1 = (400,200)
+			roi_point_2 = (roi_point_1[0]+roi_size,roi_point_1[1]+roi_size)
+			roi_matrix = cv_frame[roi_point_1[1]:roi_point_2[1],roi_point_1[0]:roi_point_2[0]]
+			roi_matrix = 255 - cv2.resize(roi_matrix, (28,28))
+			_,roi_matrix = cv2.threshold(roi_matrix,130,255,cv2.THRESH_BINARY)
+
+			
+		  	self.neural_network.feed_forward(roi_matrix /255)
+		  	output_neurons = self.neural_network.nn_neurons[-1].tolist()
+		  	max_val = max(output_neurons)
+		  	if(max_val > 0.9):
+		  		guess_val = output_neurons.index(max_val)
+		  		if(self.prev_guess != guess_val):
+		  			print(guess_val)
+		  			self.prev_guess = guess_val
+
+			cv2.rectangle(cv_frame,roi_point_1,roi_point_2, (255), thickness=3, lineType=8, shift=0)
+
+			img_miniframe = Image.fromarray(roi_matrix)
+			tk_miniframe = ImageTk.PhotoImage(image=img_miniframe)
+			label_for_minicam.imgtk = tk_miniframe
+			label_for_minicam.configure(image=tk_miniframe)
+
+			img_frame = Image.fromarray(cv_frame)
+			tk_frame = ImageTk.PhotoImage(image=img_frame)
+			label_for_cam.imgtk = tk_frame
+			label_for_cam.configure(image=tk_frame)
+			label_for_cam.after(10, render_cam_frame) 
+
+		render_cam_frame()
+
+ 	def cancel_learning(self):
+ 		self.cancel_training = True
+ 		self.prepare_new_line_graph()
+ 		self.start_learning_opt.config(state="normal")
+ 		self.cancel_learning_opt.config(state="disabled")
+ 		if(self.input_neuron_count>0):
+ 			self.render_cam_opt.config(state="normal")
+
  	def print_console(self,text):
  		self.console_list_box.configure(state="normal")
+ 		if(text==" **TRAINING** \n"):
+ 			text += ">> With graph line color: "+self.line_colors[self.new_line_count-1]
  		self.console_list_box.insert(END,">>" + text + "\n")
  		self.console_list_box.see(END)
  		self.console_list_box.configure(state="disabled")
@@ -317,35 +376,39 @@ class user_interface_handler:
  			return response
 
  	def start_learning_ui_request(self):
- 		thread.start_new_thread(self.start_learning_in_thread,())
+ 		self.cancel_training = False
+ 		self.field_result = self.check_all_fields_valid()
+ 		if(self.field_result['success'] ==True):
+ 			self.start_learning_opt.config(state="disabled")
+ 			self.cancel_learning_opt.config(state="normal")
+ 			thread.start_new_thread(self.start_learning_in_thread,())
+ 		else:
+	 		tkMessageBox.showinfo("Error", self.field_result['error'])
 
+
+	matrix_data = []
+	matrix_targets = []
+	curr_dataset_name = ""
+	input_neuron_count = 0
  	def start_learning_in_thread(self):
- 		field_result = self.check_all_fields_valid()
- 		if(field_result['success'] ==True):
-		 	testing_mode = False
-			if(testing_mode == True):
-				input_neuron_count = 2
-				output_neuron_count = 1
-				matrix_data = [[1,1],[0,1],[1,0],[0,0]]
-				matrix_targets = [[1],[0],[0],[1]]
+ 		field_result = self.field_result
+	 	testing_mode = False
 
-			else:
-				matrix_data_loader = matrix_data_loader_handler(field_result['matrix_dims'],field_result['to_retreive'],field_result['data_file_name'],self)
-				matrix_data_loader.populate_matrices()
-				input_neuron_count = matrix_data_loader.matrix_width * matrix_data_loader.matrix_height
-				matrix_data = matrix_data_loader.matrices
-				matrix_targets = matrix_data_loader.targets
-	 			self.neural_network = neural_network_handler()
-
-	 		self.neural_network.initilize_nn(field_result['hidden_layers'],
-		 			input_neuron_count,field_result['output_count'], matrix_data,matrix_targets,
-		  			field_result['biases_for_non_input_layers'], field_result['learning_constant'], 
-		  			testing_mode,field_result['weight_range'],field_result['epochs'],field_result['data_to_test'],
-		  			self)
-	 		self.neural_network.train()
-	 	else:
-	 		tkMessageBox.showinfo("Error", field_result['error'])
-
+		if(len(self.matrix_data)!=field_result['to_retreive'] or field_result['data_file_name'] != self.curr_dataset_name):
+			self.curr_dataset_name = field_result['data_file_name']
+			matrix_data_loader = matrix_data_loader_handler(field_result['matrix_dims'],field_result['to_retreive'],field_result['data_file_name'],self)
+			matrix_data_loader.populate_matrices()
+			self.input_neuron_count = matrix_data_loader.matrix_width * matrix_data_loader.matrix_height
+			self.matrix_data = matrix_data_loader.matrices
+			self.matrix_targets = matrix_data_loader.targets
+ 		
+ 		self.neural_network = neural_network_handler()
+ 		self.neural_network.initilize_nn(field_result['hidden_layers'],
+	 			self.input_neuron_count,field_result['output_count'], self.matrix_data,self.matrix_targets,
+	  			field_result['biases_for_non_input_layers'], field_result['learning_constant'], 
+	  			testing_mode,field_result['weight_range'],field_result['epochs'],field_result['data_to_test'],
+	  			self)
+ 		self.neural_network.train()
 
 	def render_neural_net_visualization(self,layers,biases):
 		self.tk_nn_visual_canvas.delete("all")
@@ -378,7 +441,6 @@ class user_interface_handler:
 		bias_pos_diff_y = 50
 		bias_color = "green"
 		bias_pos_y = neuron_radius*2
-
 
 		def get_layer_height_px(layer_count):
 			return (layer_count*(neuron_radius*2 + neuron_padding))
@@ -446,28 +508,29 @@ class neural_network_handler:
 	  				biases_for_non_input_layers, learning_constant,
 	  				testing_mode,weight_range,epochs,data_to_test,user_interface):
 
-		
 		self.user_interface = user_interface
-		self.user_interface.print_console("Constructing neural network")
-		self.all_weights = []
-		self.nn_neurons = []
-		self.weight_changes = []
-		self.biases_weights = []
-		self.biases_weight_changes = []
-		self.epochs = epochs
-		self.test_data_amount = data_to_test
-		self.matrix_data = matrix_data
-		self.hidden_layers = hidden_layers
-		self.matrix_targets = matrix_targets
-		self.learning_constant = learning_constant
-		self.output_count = output_count
-		self.input_count = input_count
-		self.testing_mode = testing_mode
-		self.biases_for_non_input_layers = biases_for_non_input_layers
-		self.weight_range = weight_range 
-		self.success_records = []
-		self.populate_nn_neurons()
-		self.populate_all_weights()
+		if(self.user_interface.cancel_training == False):
+		
+			self.user_interface.print_console("\n\n\n--------------------------- \n Constructing neural network \n\n")
+			self.all_weights = []
+			self.nn_neurons = []
+			self.weight_changes = []
+			self.biases_weights = []
+			self.biases_weight_changes = []
+			self.epochs = epochs
+			self.test_data_amount = data_to_test
+			self.matrix_data = matrix_data
+			self.hidden_layers = hidden_layers
+			self.matrix_targets = matrix_targets
+			self.learning_constant = learning_constant
+			self.output_count = output_count
+			self.input_count = input_count
+			self.testing_mode = testing_mode
+			self.biases_for_non_input_layers = biases_for_non_input_layers
+			self.weight_range = weight_range 
+			self.success_records = []
+			self.populate_nn_neurons()
+			self.populate_all_weights()
 
 	def populate_nn_neurons(self):
 		nn_inputs = np.zeros(self.input_count)
@@ -537,7 +600,6 @@ class neural_network_handler:
 	correct_count = 0
 	error_by_1000 = 0
 	error_by_1000_counter = 1
-
 	output_error_total = 0
 	
 	def back_propagate(self, target_val,repeat_count):
@@ -580,27 +642,55 @@ class neural_network_handler:
 		self.test_counter += 1
 		self.error_by_1000_counter += 1
 
-
 	def train(self):
-		
-		self.user_interface.print_console("\n **TRAINING**")
-		if(self.testing_mode == True):
-			self.repeat_count = 5000
-		for epoch in range(0,self.epochs):
-			matrix_count = 0
-			for matrix in self.matrix_data:
-				target_val = self.matrix_targets[matrix_count]
-				self.feed_forward(matrix)
-				self.back_propagate(target_val,epoch)
-				matrix_count += 1
-			
-			success_p = (float(self.correct_count)/float(self.test_data_amount))*100
-			self.user_interface.animate_graph_figures(1,success_p)
-			self.user_interface.print_console("\n Epoch "+str(epoch+1)+":   "+str(success_p)+"% success (of "+str(self.test_data_amount)+")")
-			self.test_counter = 0
-			self.correct_count = 0
+		if(self.user_interface.cancel_training == False):
+			success_list = []
+			hidden_layer_str = ""
+			for layerc in self.hidden_layers:
+				hidden_layer_str += str(layerc)+","
+			hidden_layer_str = hidden_layer_str[0:-1]
+			cancel_training = False
+			self.user_interface.print_console(" **TRAINING** \n")
+			self.user_interface.print_console("With learning rate: " + str(self.learning_constant))
+			self.user_interface.print_console("With hidden layers: " + str(hidden_layer_str))
+			self.user_interface.print_console("With test amount by epoch size: " + str(self.test_data_amount)+"/"+str(len(self.matrix_targets)))
+			self.user_interface.print_console("With epoch count: " + str(self.epochs))
 
-	#activation function for thresholding given values 
+			if(self.testing_mode == True):
+				self.repeat_count = 5000
+			for epoch in range(0,self.epochs):
+				matrix_count = 0
+				for matrix in self.matrix_data:
+					if(self.user_interface.cancel_training == True):
+						break
+					target_val = self.matrix_targets[matrix_count]
+					self.feed_forward(matrix)
+					self.back_propagate(target_val,epoch)
+					matrix_count += 1
+				if(self.user_interface.cancel_training == True):
+					break
+
+				success_p = (float(self.correct_count)/float(self.test_data_amount))*100
+				self.user_interface.animate_graph_figures(1,success_p)
+				success_list.append(success_p)
+				self.test_counter = 0
+				self.correct_count = 0
+
+			if(len(success_list)>0):
+				av_success = sum(success_list)/len(success_list)
+				highest_success = max(success_list)
+			else:
+				av_success = "N/A"
+				highest_success = "N/A"
+			training_done_msg = "**FINISHED**"
+			if(self.user_interface.cancel_training == True):
+				training_done_msg = "**CANCELLED**"
+			else:
+				self.user_interface.cancel_learning()
+			self.user_interface.print_console(training_done_msg)
+			self.user_interface.print_console("AVERAGE SUCCESS: " + str(av_success) + "%")
+			self.user_interface.print_console("HIGHEST SUCCESS: " + str(highest_success) + "%")
+
 	def activate_threshold(self,value, type):
 		if(type == "step"):
 			if(value>=0.5):
@@ -610,7 +700,6 @@ class neural_network_handler:
 		elif(type == "sigmoid"):
 			return 1/(1+(math.exp(-value)))
 
-
 	def populate_target_vector(self,target):
 		vector = []
 		for i in range(0,self.output_count):
@@ -618,11 +707,8 @@ class neural_network_handler:
 		vector[target] = 1
 		return vector
 
-
 def main():
 	tk_main = Tk()
-
-	
 	user_interface = user_interface_handler(tk_main)
 	tk_main.mainloop()
 	
