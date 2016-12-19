@@ -1,5 +1,6 @@
 from __future__ import print_function
-import cv2,re,numpy as np,random,math,time,pprint,thread,decimal,tkMessageBox,matplotlib,os
+import cv2,re,numpy as np,random,math,time,thread,decimal,tkMessageBox,matplotlib,os
+from pprint import pprint
 from Tkinter import *
 matplotlib.use('TkAgg')
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg, NavigationToolbar2TkAgg
@@ -34,6 +35,7 @@ class matrix_data_loader_handler:
 		self.data_set = open(file_name, 'r').read().split(",")
 		self.matrices = []
 		self.targets = []
+		self.input_divider_val = 255.0
 
 	def populate_matrices(self):
 		px_count = 0
@@ -45,16 +47,22 @@ class matrix_data_loader_handler:
 			matrix = np.zeros((self.matrix_width,self.matrix_height), dtype=np.float32)
 			for px_col in range(self.matrix_width):
 				for px_row in range(self.matrix_height):
-					if(px_count%(self.matrix_width*self.matrix_height)==0):
+					if(px_count%((self.matrix_width*self.matrix_height))==0):
 						self.targets.append(int(self.data_set[px_count]))
 					else:
-						matrix[px_col][px_row] = float(self.data_set[px_count]) / 255.0
+						matrix[px_col][px_row] = float(self.data_set[px_count]) / self.input_divider_val
 					px_count += 1
 			if(i%(int(self.to_retreive/5))==0):
 				self.user_interface.print_console("Loaded "+str(i)+"/"+str(self.to_retreive))
 			self.matrices.append(matrix)
 
 		self.user_interface.print_console(done_msg)
+
+	def prep_matrix_for_input(self, matrix):
+		matrix_float = matrix.astype(np.float32)
+		matrix_for_input = matrix_float / float(self.input_divider_val)
+		return matrix_for_input
+
 
 
 class user_interface_handler:
@@ -79,6 +87,7 @@ class user_interface_handler:
 		self.canvas_labels = []
 		self.render_ui_frames()
 		self.render_ui_widgets()
+		self.can_clear_graph = False
 
 	def render_ui_frames(self):
 
@@ -101,7 +110,7 @@ class user_interface_handler:
 
 		self.g_figures = range(2)
 		self.g_axis = range(2)
-		self.g_lines = [[0],[0]]
+		self.g_lines = [[],[]]
 		self.g_canvas = range(2)
 
 		rcParams.update({'figure.autolayout': True})
@@ -126,6 +135,7 @@ class user_interface_handler:
 
 	prev_line_1_data = 0.0
 	axis_g_showing = [False,False]
+	all_g1_annotations = []
 	def animate_graph_figures(self, line,data):
 		if(self.axis_g_showing[line]==False):
 			self.g_axis[line].get_yaxis().set_visible(True)
@@ -142,10 +152,26 @@ class user_interface_handler:
 
 		if(line==1): 
 			if(data!=self.prev_line_1_data):
-				self.g_axis[line].annotate(str(data)+"%",(len(ydata)-1,data))
+				self.all_g1_annotations.append(self.g_axis[line].annotate(str(data)+"%",(len(ydata)-1,data)))
+				self.all_g1_annotations[-1].set_fontsize(9)
 			self.prev_line_1_data = data
 
 		self.g_figures[line].canvas.draw()
+
+	def clear_graphs(self):
+		if(self.can_clear_graph==True):
+			for ann in range(len(self.all_g1_annotations)):
+				self.all_g1_annotations[ann].remove()
+			self.all_g1_annotations = []
+			for i in range(2):
+				pprint(self.g_lines)
+				for line in range(len(self.g_lines[i])):
+					self.g_lines[i][line].remove()
+				self.g_lines[i] = []
+				self.g_figures[i].canvas.draw()
+			self.new_line_count = 0
+			self.can_clear_graph = False
+			self.prepare_new_line_graph()
 
 	def prepare_new_line_graph(self):
 		for line in range(2):
@@ -161,9 +187,9 @@ class user_interface_handler:
  		default_output_count = "10"
 	 	input_text_length = 8
 
- 		def render_option(text, command,parent_frame):
+ 		def render_option(text, command,parent_frame,side=None,anchor=None):
  			option = Button(parent_frame, text=text, command=command)
- 			option.pack()
+ 			option.pack(side=side,anchor=anchor)
  			return option
 
  		def render_nn_vis_trigger(event=None):
@@ -234,11 +260,16 @@ class user_interface_handler:
  		self.epochs_input_label = render_input_field("10", "Epochs","Total number of iterations",input_text_length, self.learn_options_frame)
  		self.test_data_partition_input_label = render_input_field("2000", "Data for Testing","Amount of data to partition from dataset for result testing",input_text_length, self.learn_options_frame)
  		self.start_learning_opt = render_option("START LEARNING", self.start_learning_ui_request, self.learn_options_frame)
- 		self.cancel_learning_opt = render_option("CANCEL", self.cancel_learning, self.learn_options_frame)
+ 		self.cancel_learning_opt = render_option("STOP", self.cancel_learning, self.learn_options_frame)
  		self.cancel_learning_opt.config(state="disabled")
+ 		self.clear_graphs_opt = render_option("CLEAR GRAPHS", self.clear_graphs, self.learn_options_frame)
  		self.render_cam_opt = render_option("TEST WITH CAM", self.render_camera, self.learn_options_frame)
  		self.render_cam_opt.config(state="disabled")
- 	
+ 		self.test_input_fname_label = render_input_field("", "Test Image File","Enter the name of file to test",input_text_length, self.learn_options_frame)
+ 		self.test_input_opt = render_option("TEST", self.test_input_from_file, self.learn_options_frame)
+ 		self.test_input_opt.config(state="disabled")
+
+
  	def check_str_list_valid(self,string):
  		valid_str_entry = True
  		for char in string:
@@ -255,37 +286,47 @@ class user_interface_handler:
 		image_frame.pack()
 		capture_frame = cv2.VideoCapture(0)
 		label_for_cam = Label(image_frame)
-		label_for_cam.pack(expand=True)
-		label_for_minicam = Label(image_frame)
-		label_for_minicam.pack(side=LEFT)
+		label_for_cam.pack()
+
+		mini_cam_window = Toplevel(self.tk_main,width=300,height=300)
+		imagemini_frame = Frame(mini_cam_window, width=600, height=500)
+		imagemini_frame.pack()
+		label_for_minicam = Label(imagemini_frame)
+		label_for_minicam.pack()
+		self.attempt_group = []
+
 		def render_cam_frame():
 			_, cv_frame = capture_frame.read()
-			#cv_frame = cv2.flip(cv_frame, 1)
 			cv_frame = cv2.cvtColor(cv_frame, cv2.COLOR_BGR2GRAY)
-
 			roi_size = 50
 			roi_point_1 = (400,200)
 			roi_point_2 = (roi_point_1[0]+roi_size,roi_point_1[1]+roi_size)
 			roi_matrix = cv_frame[roi_point_1[1]:roi_point_2[1],roi_point_1[0]:roi_point_2[0]]
-			roi_matrix = 255 - cv2.resize(roi_matrix, (28,28))
-			_,roi_matrix = cv2.threshold(roi_matrix,130,255,cv2.THRESH_BINARY)
-
+			_,roi_matrix = cv2.threshold(roi_matrix,120,255,cv2.THRESH_BINARY_INV)
 			
-		  	self.neural_network.feed_forward(roi_matrix /255)
-		  	output_neurons = self.neural_network.nn_neurons[-1].tolist()
-		  	max_val = max(output_neurons)
-		  	if(max_val > 0.9):
-		  		guess_val = output_neurons.index(max_val)
-		  		if(self.prev_guess != guess_val):
-		  			print(guess_val)
-		  			self.prev_guess = guess_val
-
-			cv2.rectangle(cv_frame,roi_point_1,roi_point_2, (255), thickness=3, lineType=8, shift=0)
-
 			img_miniframe = Image.fromarray(roi_matrix)
 			tk_miniframe = ImageTk.PhotoImage(image=img_miniframe)
 			label_for_minicam.imgtk = tk_miniframe
 			label_for_minicam.configure(image=tk_miniframe)
+			roi_matrix = cv2.resize(roi_matrix, (self.matrix_dims[0],self.matrix_dims[1]))
+			matrix_float = self.matrix_data_loader.prep_matrix_for_input(roi_matrix)
+			outline_vals = [matrix_float[0,:-1], matrix_float[:-1,-1], matrix_float[-1,::-1], matrix_float[-2:0:-1,0]]
+			outline_sum = np.concatenate(outline_vals).sum()
+
+			if(outline_sum>0):
+				if(len(self.attempt_group)>0):
+					print(max(self.attempt_group,key=self.attempt_group.count))
+				self.attempt_group = []
+			else:
+			  	self.neural_network.feed_forward(matrix_float)
+			  	output_neurons = self.neural_network.nn_neurons[-1].tolist()
+			  	max_val = max(output_neurons)
+			  	if(max_val > 0.9):
+			  		guess_val = output_neurons.index(max_val)
+			  		print(guess_val)
+			  		self.attempt_group.append(guess_val)
+
+			cv2.rectangle(cv_frame,roi_point_1,roi_point_2, (255), thickness=3, lineType=8, shift=0)
 
 			img_frame = Image.fromarray(cv_frame)
 			tk_frame = ImageTk.PhotoImage(image=img_frame)
@@ -295,6 +336,25 @@ class user_interface_handler:
 
 		render_cam_frame()
 
+	def test_input_from_file(self):
+		file_name = self.test_input_fname_label.get() 
+		file_type_pos = file_name.rfind(".")
+		file_type_str = file_name[file_type_pos+1:]
+		image_files = ["png","jpg"]
+		print(file_name)
+		print(file_type_str)
+		if(file_type_str in image_files):
+			image_matrix = cv2.imread(file_name)
+			image_matrix = cv2.cvtColor(image_matrix, cv2.COLOR_BGR2GRAY)
+			image_matrix = cv2.resize(image_matrix, (self.matrix_dims[0],self.matrix_dims[1]))
+			matrix_float = self.matrix_data_loader.prep_matrix_for_input(image_matrix)
+			print(matrix_float)
+			self.neural_network.feed_forward(matrix_float)
+			output_neurons = self.neural_network.nn_neurons[-1].tolist()
+			output_pos_result = output_neurons.index(max(output_neurons))
+			self.print_console("**OUTPUT RESULT: " + str(output_pos_result))
+   
+
  	def cancel_learning(self):
  		self.cancel_training = True
  		self.prepare_new_line_graph()
@@ -302,11 +362,12 @@ class user_interface_handler:
  		self.cancel_learning_opt.config(state="disabled")
  		if(self.input_neuron_count>0):
  			self.render_cam_opt.config(state="normal")
+ 			self.test_input_opt.config(state="normal")
 
  	def print_console(self,text):
  		self.console_list_box.configure(state="normal")
  		if(text==" **TRAINING** \n"):
- 			text += ">> With graph line color: "+self.line_colors[self.new_line_count-1]
+ 			text += ">>With graph line color: "+self.line_colors[self.new_line_count-1]
  		self.console_list_box.insert(END,">>" + text + "\n")
  		self.console_list_box.see(END)
  		self.console_list_box.configure(state="disabled")
@@ -377,6 +438,7 @@ class user_interface_handler:
 
  	def start_learning_ui_request(self):
  		self.cancel_training = False
+ 		self.can_clear_graph = True
  		self.field_result = self.check_all_fields_valid()
  		if(self.field_result['success'] ==True):
  			self.start_learning_opt.config(state="disabled")
@@ -396,11 +458,12 @@ class user_interface_handler:
 
 		if(len(self.matrix_data)!=field_result['to_retreive'] or field_result['data_file_name'] != self.curr_dataset_name):
 			self.curr_dataset_name = field_result['data_file_name']
-			matrix_data_loader = matrix_data_loader_handler(field_result['matrix_dims'],field_result['to_retreive'],field_result['data_file_name'],self)
-			matrix_data_loader.populate_matrices()
-			self.input_neuron_count = matrix_data_loader.matrix_width * matrix_data_loader.matrix_height
-			self.matrix_data = matrix_data_loader.matrices
-			self.matrix_targets = matrix_data_loader.targets
+			self.matrix_dims = field_result['matrix_dims']
+			self.matrix_data_loader = matrix_data_loader_handler(field_result['matrix_dims'],field_result['to_retreive'],field_result['data_file_name'],self)
+			self.matrix_data_loader.populate_matrices()
+			self.input_neuron_count = self.matrix_data_loader.matrix_width * self.matrix_data_loader.matrix_height
+			self.matrix_data = self.matrix_data_loader.matrices
+			self.matrix_targets = self.matrix_data_loader.targets
  		
  		self.neural_network = neural_network_handler()
  		self.neural_network.initilize_nn(field_result['hidden_layers'],
@@ -586,6 +649,8 @@ class neural_network_handler:
 				if(len(self.biases_weights[after_input_layer-1])!=0):
 					hidden_neuron_sum += self.biases_for_non_input_layers[after_input_layer-1] * self.biases_weights[after_input_layer-1][neuron_count]
 				self.nn_neurons[after_input_layer][neuron_count] = self.activate_threshold(hidden_neuron_sum, "sigmoid")
+
+
 
 
 	def populate_input_layer(self, data):
