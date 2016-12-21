@@ -5,4 +5,4 @@ A flexible artificial neural network builder to analysis performance, and optimi
 
 
 
-<img width="1195" alt="screen shot 2016-12-21 at 11 59 06" src="https://cloud.githubusercontent.com/assets/7353547/21388615/fa44bcee-c774-11e6-82ef-88b3d5f90aa0.png">
+<img width="1197" alt="screen shot 2016-12-21 at 18 14 47" src="https://cloud.githubusercontent.com/assets/7353547/21400714/65169b30-c7a9-11e6-836f-8064d5a697e5.png">
