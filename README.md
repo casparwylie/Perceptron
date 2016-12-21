@@ -1,7 +1,7 @@
 <img width="118" alt="perceptron" src="https://cloud.githubusercontent.com/assets/7353547/21388614/f86dd680-c774-11e6-938b-1d95492999e2.png">
 # Perceptron
 
-A flexible artificial neural network builder to analysis performance, and optimise the best model. 
+A flexible artificial neural network builder for analysing and comparing performance to optimise the best model. 
 
 
 
