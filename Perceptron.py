@@ -176,6 +176,23 @@ class user_interface_handler:
 		self.g_canvas[line_num].get_tk_widget().config(width=360,height=280)
 		self.g_canvas[line_num].get_tk_widget().pack(side=LEFT,fill=X)
 
+
+	def render_canvas_info_labels(self):
+		self.canvas_info_labels = {}
+		self.canvas_info_label_vals = {}
+		self.canvas_label_names = ["Latest Success", "Latest Error", "Epoch Duration"]
+		label_y = 30
+		for label_name in self.canvas_label_names:
+			self.canvas_info_label_vals[label_name] = StringVar()
+			self.canvas_info_label_vals[label_name].set(label_name+":")
+			self.canvas_info_labels[label_name] = Label(self.tk_nn_visual_canvas, textvariable=self.canvas_info_label_vals[label_name],font=(self.font_face, self.main_font_size),bg="grey")
+			self.canvas_info_labels[label_name].place(x=self.canvas_width-230, y=self.canvas_height-label_y)
+			label_y += 20
+
+	def update_canvas_info_label(self,label_name,val):
+		self.canvas_info_label_vals[label_name].set(label_name+": "+str(val))
+
+
 	prev_line_1_data = 0.0
 	axis_g_showing = [False,False]
 	all_g1_annotations = []
@@ -222,61 +239,53 @@ class user_interface_handler:
 			self.g_lines[line].append(new_line)
 		self.new_line_count += 1
 
-	def render_ui_widgets(self):
-		test_as ="char"
-		if(test_as == "char"):
-			default_hidden_layers_str = "50"
-			default_bias_str = "1,1"
-			default_input_dims = "28,28"
-			default_data_set_str = "train_new.txt"
-			default_output_count = "10"
+
+	input_text_length = 8
+	default_hidden_layers_str = "10,20"
+	default_bias_str = "1,1"
+	default_input_dims = "20"
+	default_data_set_str = ".txt"
+	default_output_count = "5"
+
+	def render_nn_vis_trigger(self,event=None):
+		if(event==None):
+			hidden_str = self.default_hidden_layers_str
+			bias_str = self.default_bias_str
+			input_dims = self.default_input_dims
+			output_count = int(self.default_output_count)
 		else:
-			default_hidden_layers_str = "4"
-			default_bias_str = "1,1"
-			default_input_dims = "2"
-			default_data_set_str = "or_data.txt"
-			default_output_count = "1"
-		self.input_text_length = 8
-
-
-		def render_nn_vis_trigger(event=None):
-			if(event==None):
-				hidden_str = default_hidden_layers_str
-				bias_str = default_bias_str
-				input_dims = default_input_dims
-				output_count = int(default_output_count)
+			hidden_str = self.input_fields["hidden_layer"].get()
+			bias_str = self.input_fields["bias_vals"].get()
+			input_dims = self.input_fields["matrix_dims"].get()
+			output_count_str = self.input_fields["output_count"].get()
+			if(output_count_str.isdigit()):
+				output_count = int(output_count_str)
 			else:
-				hidden_str = self.input_fields["hidden_layer"].get()
-				bias_str = self.input_fields["bias_vals"].get()
-				input_dims = self.input_fields["matrix_dims"].get()
-				output_count_str = self.input_fields["output_count"].get()
-				if(output_count_str.isdigit()):
-					output_count = int(output_count_str)
-				else:
-					output_count = -1
+				output_count = -1
 
-			if(self.check_str_list_valid(hidden_str+bias_str) == True and hidden_str != "" and bias_str != "" and input_dims != ""):
-				if(hidden_str[-1]==","):
-					hidden_str = hidden_str[0:-1]
-				if(bias_str[-1]==","):
-					bias_str = bias_str[0:-1]
-				if(input_dims[-1]==","):
-					input_dims = input_dims[0:-1]
-				if(self.check_str_list_valid(input_dims) == True and output_count > 0):
-					input_dims = input_dims.split(",")
-					inputs_total = int(input_dims[0])
-					if(len(input_dims)==2): inputs_total = inputs_total * int(input_dims[1])
-					layers = [inputs_total]
-					hidden_layers = hidden_str.split(",")
-					layers.extend(hidden_layers)
-					biases = bias_str.split(",")
-					layers.append(output_count)
-					layers = map(int,layers)
-					biases = map(int,biases)
-					if(len(layers) > 0 and len(biases) > 0):
-						self.render_neural_net_visualization(layers,biases)
+		if(self.check_str_list_valid(hidden_str+bias_str) == True and hidden_str != "" and bias_str != "" and input_dims != ""):
+			if(hidden_str[-1]==","):
+				hidden_str = hidden_str[0:-1]
+			if(bias_str[-1]==","):
+				bias_str = bias_str[0:-1]
+			if(input_dims[-1]==","):
+				input_dims = input_dims[0:-1]
+			if(self.check_str_list_valid(input_dims) == True and output_count > 0):
+				input_dims = input_dims.split(",")
+				inputs_total = int(input_dims[0])
+				if(len(input_dims)==2): inputs_total = inputs_total * int(input_dims[1])
+				layers = [inputs_total]
+				hidden_layers = hidden_str.split(",")
+				layers.extend(hidden_layers)
+				biases = bias_str.split(",")
+				layers.append(output_count)
+				layers = map(int,layers)
+				biases = map(int,biases)
+				if(len(layers) > 0 and len(biases) > 0):
+					self.render_neural_net_visualization(layers,biases)
 
-		render_nn_vis_trigger()
+	def render_ui_widgets(self):
+		self.render_nn_vis_trigger()
 		
 		icon = ImageTk.PhotoImage(Image.open("resources/perceptron-header.jpg").resize((230, 100), Image.ANTIALIAS))
 		self.icon_view = Label(self.learn_options_frame,image=icon)
@@ -287,15 +296,17 @@ class user_interface_handler:
 		self.choose_settings_frame.pack()
 		self.render_settings_opts()
 
+		self.render_canvas_info_labels()
+
 		self.input_fields = {}
 		self.clear_graphs_opt = self.render_option("PREPROCCESS DATA", self.preproccess_data_render, self.learn_options_frame)
 
-		self.input_fields["dataset_name"] = self.render_input_field(default_data_set_str, "Dataset file","Save a text file into the current directory and enter name here",self.input_text_length,self.learn_options_frame)
+		self.input_fields["dataset_name"] = self.render_input_field(self.default_data_set_str, "Dataset file","Save a text file into the current directory and enter name here",self.input_text_length,self.learn_options_frame)
 		self.input_fields["data_to_retrieve"]= self.render_input_field("all", "Data To Use","Enter 'all' or number",self.input_text_length,self.learn_options_frame)
-		self.input_fields["matrix_dims"] = self.render_input_field(default_input_dims,"Matrix Input Dimensions","Enter height, width of matrix",self.input_text_length,self.learn_options_frame,command=render_nn_vis_trigger)
-		self.input_fields["output_count"] = self.render_input_field(default_output_count, "Output Count","Enter output quantity",self.input_text_length,self.learn_options_frame,command=render_nn_vis_trigger)
-		self.input_fields["hidden_layer"] = self.render_input_field(default_hidden_layers_str, "Hidden Layers", "Enter comma seperated list of layer sizes",self.input_text_length, self.learn_options_frame,command=render_nn_vis_trigger)
-		self.input_fields["bias_vals"] = self.render_input_field(default_bias_str, "Bias Values", "List must match hidden layer count plus output, but enter 0 for no bias",self.input_text_length,self.learn_options_frame,command=render_nn_vis_trigger)
+		self.input_fields["matrix_dims"] = self.render_input_field(self.default_input_dims,"Matrix Input Dimensions","Enter height, width of matrix",self.input_text_length,self.learn_options_frame,command=self.render_nn_vis_trigger)
+		self.input_fields["output_count"] = self.render_input_field(self.default_output_count, "Output Count","Enter output quantity",self.input_text_length,self.learn_options_frame,command=self.render_nn_vis_trigger)
+		self.input_fields["hidden_layer"] = self.render_input_field(self.default_hidden_layers_str, "Hidden Layers", "Enter comma seperated list of layer sizes",self.input_text_length, self.learn_options_frame,command=self.render_nn_vis_trigger)
+		self.input_fields["bias_vals"] = self.render_input_field(self.default_bias_str, "Bias Values", "List must match hidden layer count plus output, but enter 0 for no bias",self.input_text_length,self.learn_options_frame,command=self.render_nn_vis_trigger)
 		self.input_fields["learning_rate"] = self.render_input_field("0.5", "Learning Rate","Enter decimal or integer",self.input_text_length,self.learn_options_frame)
 		self.input_fields["weight_range"] = self.render_input_field("-1,1", "Weight Ranges","Enter one value (or two for a range) for initial weight values",self.input_text_length, self.learn_options_frame)
 		self.input_fields["epochs"] = self.render_input_field("10", "Epochs","Total number of iterations",self.input_text_length, self.learn_options_frame)
@@ -335,6 +346,7 @@ class user_interface_handler:
 			for input_field in self.input_fields:
 				self.input_fields[input_field].delete(0,END)
 				self.input_fields[input_field].insert(0,spec_settings[input_field])
+			self.render_nn_vis_trigger(True)
 
 	def render_settings_opts(self):
 		self.saved_settings_dis_text = "--Saved Settings--"
@@ -485,7 +497,7 @@ class user_interface_handler:
 				if(file_type_str == "txt"):
 					input_str = open(input_str, 'r').read()
 				input_data = input_str.split(",")
-				item_as_array = prep_matrix_for_input(self, input_data)
+				item_as_array = self.matrix_data_loader.prep_matrix_for_input(np.asarray(input_data))
 				matrix_ready = np.reshape(item_as_array,(self.matrix_dims[0],self.matrix_dims[1]),order="A")	
 				
 			elif(file_type_str in valid_files):
@@ -555,7 +567,10 @@ class user_interface_handler:
 			error = "Invalid matrix dimensions"
 		else:
 			valid_values['matrix_dims'] = map(int,matrix_dims_str.split(","))
-		if(self.check_str_list_valid(weight_range_str.replace(".", "", 1).replace("-", "", 1))==False):
+
+		weight_range_str_test = weight_range_str.replace(".", "")
+		weight_range_str_test = weight_range_str_test.replace("-", "")
+		if(self.check_str_list_valid(weight_range_str_test)==False):
 			error = "Invalid weight ranges"
 		else:
 			valid_values['weight_range'] = map(float,weight_range_str.split(","))
@@ -660,7 +675,8 @@ class user_interface_handler:
 		if(neuron_radius > 15): neuron_radius = 15
 		neuron_x = neuron_radius + 20
 		neuron_dist_x = (self.canvas_width / (len(layers)-1)) - neuron_x*2
-		neuron_color = "blue"
+		neuron_hidden_c = "blue"
+		neuron_outter_c = "red"
 
 		bias_pos_diff_x = 50
 		bias_pos_diff_y = 50
@@ -686,13 +702,15 @@ class user_interface_handler:
 			neuron_ystart = (self.canvas_height - get_layer_height_px(length_of_layer))/2
 			neuron_y = neuron_ystart
 			layer_has_bias = ((neuron_layer > 0) and (biases[neuron_layer-1] != 0))
-			
 			if layer_has_bias == True:
 				bias_y_pos = 20
 				bias_x_pos = neuron_x-bias_pos_diff_x
 				bias_oval = self.tk_nn_visual_canvas.create_oval(bias_x_pos-neuron_radius,bias_y_pos-neuron_radius,bias_x_pos+neuron_radius,bias_y_pos+neuron_radius, fill=bias_color,outline=bias_color)
 				self.tk_nn_visual_canvas.tag_raise(bias_oval)
 
+			neuron_color = neuron_hidden_c
+			if(neuron_layer==0 or neuron_layer == len(layers)-1):
+				neuron_color = neuron_outter_c
 			for single_neuron in range(0,length_of_layer):
 				if(single_neuron == 0):
 					real_layer_count = layers[neuron_layer]
@@ -735,7 +753,6 @@ class neural_network_handler:
 
 		self.user_interface = user_interface
 		if(self.user_interface.cancel_training == False):
-		
 			self.user_interface.print_console("\n\n\n--------------------------- \n Constructing neural network \n\n")
 			self.all_weights = []
 			self.nn_neurons = []
@@ -754,6 +771,11 @@ class neural_network_handler:
 			self.biases_for_non_input_layers = biases_for_non_input_layers
 			self.weight_range = weight_range 
 			self.success_records = []
+			if(len(self.matrix_targets)<100):
+				self.is_small_data = True
+			else:
+				self.is_small_data = False
+
 			self.populate_nn_neurons()
 			self.populate_all_weights()
 
@@ -805,13 +827,13 @@ class neural_network_handler:
 	def feed_forward(self, matrix):
 		self.populate_input_layer(matrix)
 		for after_input_layer in range(1, len(self.nn_neurons)):
-			for neuron_count in range(0, len(self.nn_neurons[after_input_layer])):
-				relevant_weights = self.all_weights[after_input_layer-1][neuron_count]
-				hidden_neuron_sum = np.dot(relevant_weights, self.nn_neurons[after_input_layer-1])
-				if(len(self.biases_weights[after_input_layer-1])!=0):
-					hidden_neuron_sum += self.biases_for_non_input_layers[after_input_layer-1] * self.biases_weights[after_input_layer-1][neuron_count]
-				self.nn_neurons[after_input_layer][neuron_count] = self.activate_threshold(hidden_neuron_sum, "sigmoid")
-
+			hidden_neuron_sums = np.dot(np.asarray(self.all_weights[after_input_layer-1]) , self.nn_neurons[after_input_layer-1])
+			if(len(self.biases_weights[after_input_layer-1])!=0):
+				#print("hidden_to_add: ",hidden_neuron_sums, "sh: ",hidden_neuron_sums.shape)
+				bias_vals = (self.biases_for_non_input_layers[after_input_layer-1] * self.biases_weights[after_input_layer-1])
+				#print("bias_vals_adding: ", bias_vals, "sh: ",bias_vals.shape)
+				hidden_neuron_sums += bias_vals
+			self.nn_neurons[after_input_layer] = self.activate_threshold(hidden_neuron_sums, "sigmoid")
 
 	def populate_input_layer(self, data):
 		value_count = 0
@@ -833,26 +855,21 @@ class neural_network_handler:
 			target_vector = self.populate_target_vector(target_val)
 		else:
 			target_vector = target_val
-		self.output_error_total = 0.5*((self.nn_neurons[-1] - target_vector)**2).sum()
-
 		if(len(self.nn_neurons[-1])>1):
 			outputs_as_list = self.nn_neurons[-1].tolist()
 			success_condition = (outputs_as_list.index(max(outputs_as_list))==target_val)
 		else:
 			success_condition = (round(self.nn_neurons[-1][0]) == target_vector)
-		
 		if(self.test_counter >= len(self.matrix_data)-self.test_data_amount):
 			if(success_condition == True):
 				self.correct_count += 1
-
 		if(success_condition == False):
 				self.error_by_1000 += 1
-
 		if(self.error_by_1000_counter % 1000 == 0):
 			self.user_interface.animate_graph_figures(0,self.error_by_1000/10)
+			self.user_interface.update_canvas_info_label("Latest Error",str(self.error_by_1000/10)+"% (ep. "+str(repeat_count)+")")
 			self.error_by_1000 = 0
 			self.error_by_1000_counter = 0
-
 		for weight_layer_count in range(len(self.all_weights)-1,-1,-1):
 			weight_neuron_vals = np.expand_dims(self.nn_neurons[weight_layer_count+1],axis=1)
 			target_vector = np.expand_dims(target_vector,axis=1)
@@ -863,7 +880,11 @@ class neural_network_handler:
 				back_prop_cost_to_sum = np.dot(np.asarray(self.all_weights[weight_layer_count+1]).transpose(),back_prop_cost_to_sum) * activated_to_sum_step
 
 			if(len(self.biases_weights[weight_layer_count])!=0):
-				self.biases_weights[weight_layer_count] = back_prop_cost_to_sum
+				current_bias_weight_vals = self.biases_weights[weight_layer_count]
+				#print("bpc_bias: ", current_bias_weight_vals.shape)
+				#print("bpc_bias: ", back_prop_cost_to_sum.shape)
+				self.biases_weights[weight_layer_count] = current_bias_weight_vals - (self.learning_constant * back_prop_cost_to_sum.flatten())
+				#print("bp_newb: ", self.biases_weights[weight_layer_count].shape)
 			input_neuron_vals = np.expand_dims(self.nn_neurons[weight_layer_count],axis=1)
 			full_back_prop_sum_to_input = np.dot(back_prop_cost_to_sum,input_neuron_vals.transpose())
 			current_weight_vals = self.all_weights[weight_layer_count]
@@ -892,7 +913,10 @@ class neural_network_handler:
 
 			if(self.testing_mode == True):
 				self.repeat_count = 5000
-			for epoch in range(0,self.epochs):
+
+			epoch_times = []
+			for epoch in range(1,self.epochs+1):
+				pre_epoch_time = time.time()
 				matrix_count = 0
 				for matrix in self.matrix_data:
 					if(self.user_interface.cancel_training == True):
@@ -906,13 +930,22 @@ class neural_network_handler:
 
 				success_p = (float(self.correct_count)/float(self.test_data_amount))*100
 				self.user_interface.animate_graph_figures(1,success_p)
+				e_note_str = " (ep. "+str(epoch)+")"
+
+				if(self.is_small_data == False):
+					self.user_interface.update_canvas_info_label("Latest Success",str(success_p)+"%"+e_note_str)
 				success_list.append(success_p)
 				self.test_counter = 0
 				self.correct_count = 0
+				post_epoch_time = time.time() - pre_epoch_time
+				if(self.is_small_data == False):
+					self.user_interface.update_canvas_info_label("Epoch Duration",str(round(post_epoch_time,3))+e_note_str)
+				epoch_times.append(post_epoch_time)
 
 			if(len(success_list)>0):
 				av_success = sum(success_list)/len(success_list)
 				highest_success = max(success_list)
+				av_epoch_time = sum(epoch_times)/len(epoch_times)
 			else:
 				av_success = "N/A"
 				highest_success = "N/A"
@@ -924,6 +957,8 @@ class neural_network_handler:
 			self.user_interface.print_console(training_done_msg)
 			self.user_interface.print_console("AVERAGE SUCCESS: " + str(av_success) + "%")
 			self.user_interface.print_console("HIGHEST SUCCESS: " + str(highest_success) + "%")
+			self.user_interface.print_console("TOTAL TIME: " + str(sum(epoch_times,5)) + "s")
+			self.user_interface.print_console("AVERAGE EPOCH TIME: " + str(round(av_epoch_time,5)) + "s")
 
 	def activate_threshold(self,value, type):
 		if(type == "step"):
@@ -932,7 +967,7 @@ class neural_network_handler:
 			else:
 				return 0
 		elif(type == "sigmoid"):
-			return 1/(1 + math.exp(-value))
+			return 1/(1 + np.exp(-value))
 
 	def populate_target_vector(self,target):
 		vector = []
