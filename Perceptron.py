@@ -180,7 +180,7 @@ class user_interface_handler:
 	def render_canvas_info_labels(self):
 		self.canvas_info_labels = {}
 		self.canvas_info_label_vals = {}
-		self.canvas_label_names = ["Latest Success", "Latest Error", "Epoch Duration"]
+		self.canvas_label_names = ["Latest Success", "Epoch Duration"]
 		label_y = 30
 		for label_name in self.canvas_label_names:
 			self.canvas_info_label_vals[label_name] = StringVar()
@@ -299,44 +299,105 @@ class user_interface_handler:
 		self.render_canvas_info_labels()
 
 		self.input_fields = {}
-		self.clear_graphs_opt = self.render_option("PREPROCCESS DATA", self.preproccess_data_render, self.learn_options_frame)
+		self.input_labels = {}
+		self.input_descs = {}
+		self.widget_frames = {}
+		self.input_descs_vis = {}
 
-		self.input_fields["dataset_name"] = self.render_input_field(self.default_data_set_str, "Dataset file","Save a text file into the current directory and enter name here",self.input_text_length,self.learn_options_frame)
-		self.input_fields["data_to_retrieve"]= self.render_input_field("all", "Data To Use","Enter 'all' or number",self.input_text_length,self.learn_options_frame)
-		self.input_fields["matrix_dims"] = self.render_input_field(self.default_input_dims,"Matrix Input Dimensions","Enter height, width of matrix",self.input_text_length,self.learn_options_frame,command=self.render_nn_vis_trigger)
+		self.clear_graphs_opt = self.render_option("PREPROCCESSOR", self.preproccess_data_render, self.learn_options_frame)
+
+		self.input_fields["dataset_name"] = self.render_input_field(self.default_data_set_str, "Dataset file","Enter name of dataset file to train",self.input_text_length,self.learn_options_frame)
+		self.input_fields["data_to_retrieve"]= self.render_input_field("all", "Data To Use","Enter 'all' or number of items to use from dataset",self.input_text_length,self.learn_options_frame)
+		self.input_fields["matrix_dims"] = self.render_input_field(self.default_input_dims,"Matrix Input Dimensions","Enter single value or enter height, width of matrix with comma",self.input_text_length,self.learn_options_frame,command=self.render_nn_vis_trigger)
 		self.input_fields["output_count"] = self.render_input_field(self.default_output_count, "Output Count","Enter output quantity",self.input_text_length,self.learn_options_frame,command=self.render_nn_vis_trigger)
-		self.input_fields["hidden_layer"] = self.render_input_field(self.default_hidden_layers_str, "Hidden Layers", "Enter comma seperated list of layer sizes",self.input_text_length, self.learn_options_frame,command=self.render_nn_vis_trigger)
+		self.input_fields["hidden_layer"] = self.render_input_field(self.default_hidden_layers_str, "Hidden Layers", "Enter comma seperated list of hidden layer sizes",self.input_text_length, self.learn_options_frame,command=self.render_nn_vis_trigger)
 		self.input_fields["bias_vals"] = self.render_input_field(self.default_bias_str, "Bias Values", "List must match hidden layer count plus output, but enter 0 for no bias",self.input_text_length,self.learn_options_frame,command=self.render_nn_vis_trigger)
 		self.input_fields["learning_rate"] = self.render_input_field("0.5", "Learning Rate","Enter decimal or integer",self.input_text_length,self.learn_options_frame)
 		self.input_fields["weight_range"] = self.render_input_field("-1,1", "Weight Ranges","Enter one value (or two for a range) for initial weight values",self.input_text_length, self.learn_options_frame)
-		self.input_fields["epochs"] = self.render_input_field("10", "Epochs","Total number of iterations",self.input_text_length, self.learn_options_frame)
+		self.input_fields["epochs"] = self.render_input_field("10", "Epochs","Total number of iterations through all data loaded",self.input_text_length, self.learn_options_frame)
 		self.input_fields["test_data_partition"] = self.render_input_field("2000", "Data for Testing","Amount of data to partition from dataset for result testing",self.input_text_length, self.learn_options_frame)
 		
-		self.start_learning_opt = self.render_option("START LEARNING", self.start_learning_ui_request, self.learn_options_frame)
-		self.cancel_learning_opt = self.render_option("STOP", self.cancel_learning, self.learn_options_frame)
+		self.lower_sect = Frame(self.learn_options_frame)
+		self.lower_sect.pack(expand=True,fill=BOTH)
+		self.opt_cols = Frame(self.lower_sect)
+		self.opt_cols.pack(side=TOP,expand=True)
+		self.left_opt_col = Frame(self.opt_cols)
+		self.left_opt_col.pack(side=LEFT)
+		self.right_opt_col = Frame(self.opt_cols)
+		self.right_opt_col.pack(side=RIGHT)
+
+		self.start_learning_opt = self.render_option("Start Learning", self.start_learning_ui_request, self.left_opt_col)
+		self.cancel_learning_opt = self.render_option("Stop Learning", self.cancel_learning, self.left_opt_col)
 		self.cancel_learning_opt.config(state="disabled")
-		self.clear_graphs_opt = self.render_option("Clear Graphs", self.clear_graphs, self.learn_options_frame)
-		self.save_settings_opt = self.render_option("Save Settings",self.save_settings,self.learn_options_frame)
-		self.input_fields["test_input_val"] = self.render_input_field("", "Test Input","Enter the name of an image file, text file, or enter data manually",self.input_text_length, self.learn_options_frame)
-		self.test_input_opt = self.render_option("Test", self.test_input, self.learn_options_frame)
-		self.test_input_opt.config(state="disabled")
+		self.clear_graphs_opt = self.render_option("Clear Graphs", self.clear_graphs, self.right_opt_col)
+		self.save_settings_opt = self.render_option("Save Settings",self.save_settings,self.right_opt_col)
+		self.save_nn_opt = self.render_option("Save Trained NN",self.save_nn,self.right_opt_col)
+		self.save_nn_opt.config(state="disabled")
+		self.test_input_opt = self.render_option("Test With Input",self.test_input, self.left_opt_col)
+		self.load_nn_opt = self.render_option("Load Trained NN", self.load_nn,self.right_opt_col)
 
 	def render_input_field(self,default_value, label_text,desc_text,width,parent_frame,command=None):
-			widget_frame = Frame(parent_frame)
-			widget_frame.pack(fill=X,expand=False)
-			#desc_frame = Frame(widget_frame, width=50)
-			#desc_frame.pack(side=BOTTOM,expand=False)
-			text_input = Entry(widget_frame, width=width)
+			label_text = label_text+": "
+			self.widget_frames[label_text] = Frame(parent_frame)
+			self.widget_frames[label_text].pack(fill=X,expand=False)
+
+			desc_frame = Frame(self.widget_frames[label_text], width=50, height=0)
+			desc_frame.pack(fill=None,side=BOTTOM,expand=False)
+
+			text_input = Entry(self.widget_frames[label_text], width=width)
+			text_input.pack(side=RIGHT)
+			text_input.insert(0,str(default_value))
 			if(command!=None):
 				text_input.bind("<KeyRelease>", command)
-
-			text_input.insert(0,str(default_value))
-			text_input.pack(side=RIGHT)
-			input_label = Label(widget_frame, text=label_text+": ",font=(self.font_face, self.main_font_size))
-			input_label.pack(side=LEFT)
-			#label_desc = Label(desc_frame, text="*"+desc_text, font=(self.font_face, 10), fg="#60606b",wraplength=210)
-			#label_desc.pack(side=BOTTOM)
+			
+			self.input_labels[label_text] = Label(self.widget_frames[label_text], text=label_text,font=(self.font_face, self.main_font_size))
+			self.input_labels[label_text].pack(side=LEFT)
+			self.widget_frames[label_text].bind("<Enter>", self.toggle_desc_label)
+			self.widget_frames[label_text].bind("<Leave>", self.toggle_desc_label)
+			self.input_descs[label_text] = Label(desc_frame, text="*"+desc_text, font=(self.font_face, 1), fg="white",wraplength=210)
+			self.input_descs[label_text].pack(side=BOTTOM)
+			self.input_descs_vis[label_text] = 0
 			return text_input
+
+	def render_option(self,text, command,parent_frame,side=None,anchor=None):
+		option = Button(parent_frame, text=text, command=command,width=12)
+		option.pack(side=side,anchor=anchor)
+		return option
+
+	def toggle_desc_label(self, event):
+		label_text = event.widget.winfo_children()[2].cget("text")
+		if(self.input_descs_vis[label_text] % 2 ==0):
+			self.input_descs[label_text].configure(fg="#60606b")
+			self.input_descs[label_text].configure(font=(self.font_face, 10))
+		else:
+			self.input_descs[label_text].configure(fg="white")
+			self.input_descs[label_text].configure(font=(self.font_face, 1))
+		self.input_descs_vis[label_text] += 1
+
+	def save_nn(self):
+		nn_name = tkSimpleDialog.askstring("Saving Neural Network", "Neural Net Name: ")
+		if(nn_name):
+			weight_layers = self.neural_network.all_weights
+			weights_as_list = []
+			for layer in weight_layers:
+				l_layer = []
+				print("L")
+				for w_group in layer:
+					l_group = []
+					print("		G")
+					for w in w_group:
+						print(w)	
+						l_group.append(w)
+					l_layer.append(l_group)
+				weights_as_list.append(l_layer)
+
+			weights_as_json = json.dumps(weights_as_list)
+			
+			new_file = open("saved/nn_"+nn_name+".txt", "a")
+			new_file.write(weights_as_json)
+
+	def load_nn(self):
+		print("n")
 
 	def load_settings(self,value):
 		setting_to_load = self.saved_settings_text.get()
@@ -363,7 +424,7 @@ class user_interface_handler:
 		self.saved_settings_text.set(saved_settings[0])
 
 	def save_settings(self):
-		settings_name = tkSimpleDialog.askstring("Perceptron", "Setting's Name: ")
+		settings_name = tkSimpleDialog.askstring("Saving Settings", "Setting's Name: ")
 		if(settings_name != None):
 			if(len(settings_name)>1):
 				settings_file_read = open(self.settings_file_name, "r")
@@ -384,10 +445,6 @@ class user_interface_handler:
 				self.saved_settings_opts.destroy()
 				self.render_settings_opts()
 	
-	def render_option(self,text, command,parent_frame,side=None,anchor=None):
-			option = Button(parent_frame, text=text, command=command)
-			option.pack(side=side,anchor=anchor)
-			return option
 
 	def check_str_list_valid(self,string):
 		valid_str_entry = True
@@ -413,6 +470,10 @@ class user_interface_handler:
 		label_for_minicam = Label(imagemini_frame)
 		label_for_minicam.pack()
 
+		guess_str_val = StringVar()
+		label_guess = Label(mini_cam_window, text="",font=(self.font_face, 20),textvariable=guess_str_val)
+		label_guess.pack()
+
 		def render_cam_frame():
 			_, cv_frame = capture_frame.read()
 			cv_frame = cv2.cvtColor(cv_frame, cv2.COLOR_BGR2GRAY)
@@ -437,7 +498,7 @@ class user_interface_handler:
 				max_val = max(output_neurons)
 				if(max_val > 0.9):
 					guess_val = output_neurons.index(max_val)
-					print(guess_val)
+					guess_str_val.set(guess_val)
 
 			cv2.rectangle(cv_frame,roi_point_1,roi_point_2, (255), thickness=3, lineType=8, shift=0)
 
@@ -482,49 +543,51 @@ class user_interface_handler:
 		preproccessor_handler.normalise_text_file(file_name,target_pos,values_to_ignore,divider)
 
 	def test_input(self):
-		input_str = self.input_fields["test_input_val"].get() 
-		file_type_pos = input_str.rfind(".")
-		valid_files = ["png","jpg","txt"]
-		file_type_str = ""
-
-		if(input_str == "camera"):
-			self.render_camera()
-		else:
-			if(file_type_pos != -1):
-				file_type_str = input_str[file_type_pos+1:]
-			
-			if(file_type_str not in valid_files or file_type_str == "txt"):
-				if(file_type_str == "txt"):
-					input_str = open(input_str, 'r').read()
-				input_data = input_str.split(",")
-				item_as_array = self.matrix_data_loader.prep_matrix_for_input(np.asarray(input_data))
-				matrix_ready = np.reshape(item_as_array,(self.matrix_dims[0],self.matrix_dims[1]),order="A")	
+		input_str = tkSimpleDialog.askstring("Enter Input", "Enter the name of an image file, text file, enter data manually, or to use camera input enter 'camera': ")
+		if(input_str):
+			file_type_pos = input_str.rfind(".")
+			valid_files = ["png","jpg","txt"]
+			file_type_str = ""
+			if(input_str == "camera"):
+				self.render_camera()
+			else:
+				if(file_type_pos != -1):
+					file_type_str = input_str[file_type_pos+1:]
 				
-			elif(file_type_str in valid_files):
-				image_matrix = cv2.imread(file_name)
-				image_matrix = cv2.cvtColor(image_matrix, cv2.COLOR_BGR2GRAY)
-				image_matrix = cv2.resize(image_matrix, (self.matrix_dims[0],self.matrix_dims[1]))
-				matrix_ready = self.matrix_data_loader.prep_matrix_for_input(image_matrix)
-			else:
-				output_pos_result = -1
-				self.print_console("**ERROR: invalid test input")
+				if(file_type_str not in valid_files or file_type_str == "txt"):
+					if(file_type_str == "txt"):
+						input_str = open(input_str, 'r').read()
+					input_data = input_str.split(",")
+					item_as_array = self.matrix_data_loader.prep_matrix_for_input(np.asarray(input_data))
+					matrix_ready = np.reshape(item_as_array,(self.matrix_dims[0],self.matrix_dims[1]),order="A")	
+					
+				elif(file_type_str in valid_files):
+					image_matrix = cv2.imread(file_name)
+					image_matrix = cv2.cvtColor(image_matrix, cv2.COLOR_BGR2GRAY)
+					image_matrix = cv2.resize(image_matrix, (self.matrix_dims[0],self.matrix_dims[1]))
+					matrix_ready = self.matrix_data_loader.prep_matrix_for_input(image_matrix)
+				else:
+					output_pos_result = -1
+					self.print_console("**ERROR: invalid test input")
 
-			self.neural_network.feed_forward(matrix_ready)
-			output_neurons = self.neural_network.nn_neurons[-1].tolist()
-			if(len(output_neurons)>1):
-				output_pos_result = output_neurons.index(max(output_neurons))
-			else:
-				output_pos_result = output_neurons[0]
+				self.neural_network.feed_forward(matrix_ready)
+				output_neurons = self.neural_network.nn_neurons[-1].tolist()
+				if(len(output_neurons)>1):
+					output_pos_result = output_neurons.index(max(output_neurons))
+				else:
+					output_pos_result = output_neurons[0]
 
 
-			if(output_pos_result != -1):
-				self.print_console("**OUTPUT RESULT: " + str(output_pos_result))
+				if(output_pos_result != -1):
+					self.print_console("**OUTPUT RESULT: " + str(output_pos_result))
 	
 	def cancel_learning(self):
 		self.cancel_training = True
 		self.prepare_new_line_graph()
 		self.start_learning_opt.config(state="normal")
 		self.cancel_learning_opt.config(state="disabled")
+		self.load_nn_opt.config(state="normal")
+		self.save_nn_opt.config(state="normal")
 		if(self.input_neuron_count>0):
 			self.test_input_opt.config(state="normal")
 
@@ -615,6 +678,8 @@ class user_interface_handler:
 		if(self.field_result['success'] ==True):
 			self.start_learning_opt.config(state="disabled")
 			self.cancel_learning_opt.config(state="normal")
+			self.load_nn_opt.config(state="disabled")
+			self.save_nn_opt.config(state="disabled")
 			thread.start_new_thread(self.start_learning_in_thread,())
 		else:
 			tkMessageBox.showinfo("Error", self.field_result['error'])
@@ -841,7 +906,6 @@ class neural_network_handler:
 			self.nn_neurons[0] = data.flatten()
 		else:
 			self.nn_neurons[0] = np.array(data)
-
 	testing_output_mode = False
 	test_counter = 0
 	correct_count = 0
@@ -867,7 +931,6 @@ class neural_network_handler:
 				self.error_by_1000 += 1
 		if(self.error_by_1000_counter % 1000 == 0):
 			self.user_interface.animate_graph_figures(0,self.error_by_1000/10)
-			self.user_interface.update_canvas_info_label("Latest Error",str(self.error_by_1000/10)+"% (ep. "+str(repeat_count)+")")
 			self.error_by_1000 = 0
 			self.error_by_1000_counter = 0
 		for weight_layer_count in range(len(self.all_weights)-1,-1,-1):
@@ -893,9 +956,6 @@ class neural_network_handler:
 	
 		self.test_counter += 1
 		self.error_by_1000_counter += 1
-
-	def save_network_as_json():
-		weight_layers = self.all_weights.tolist()
 
 	def train(self):
 		if(self.user_interface.cancel_training == False):
@@ -939,7 +999,7 @@ class neural_network_handler:
 				self.correct_count = 0
 				post_epoch_time = time.time() - pre_epoch_time
 				if(self.is_small_data == False):
-					self.user_interface.update_canvas_info_label("Epoch Duration",str(round(post_epoch_time,3))+e_note_str)
+					self.user_interface.update_canvas_info_label("Epoch Duration",str(round(post_epoch_time,3))+"s "+e_note_str)
 				epoch_times.append(post_epoch_time)
 
 			if(len(success_list)>0):
@@ -949,6 +1009,7 @@ class neural_network_handler:
 			else:
 				av_success = "N/A"
 				highest_success = "N/A"
+				av_epoch_time = "N/A"
 			training_done_msg = "**FINISHED**"
 			if(self.user_interface.cancel_training == True):
 				training_done_msg = "**CANCELLED**"
