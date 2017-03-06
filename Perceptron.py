@@ -287,7 +287,7 @@ class user_interface_handler:
 	def render_ui_widgets(self):
 		self.render_nn_vis_trigger()
 		
-		icon = ImageTk.PhotoImage(Image.open("resources/perceptron-header.jpg").resize((230, 100), Image.ANTIALIAS))
+		icon = ImageTk.PhotoImage(Image.open("resources/perceptron-header.jpg"))#.resize((230, 100), Image.ANTIALIAS))
 		self.icon_view = Label(self.learn_options_frame,image=icon)
 		self.icon_view.image = icon
 		self.icon_view.pack()
@@ -331,11 +331,10 @@ class user_interface_handler:
 		self.cancel_learning_opt.config(state="disabled")
 		self.clear_graphs_opt = self.render_option("Clear Graphs", self.clear_graphs, self.right_opt_col)
 		self.save_settings_opt = self.render_option("Save Settings",self.save_settings,self.right_opt_col)
-		self.save_nn_opt = self.render_option("Save Trained NN",self.save_nn,self.right_opt_col)
+		self.save_nn_opt = self.render_option("Export Trained NN",self.save_nn,self.right_opt_col)
 		self.save_nn_opt.config(state="disabled")
 		self.test_input_opt = self.render_option("Test With Input",self.test_input, self.left_opt_col)
-		self.load_nn_opt = self.render_option("Load Trained NN", self.load_nn,self.right_opt_col)
-
+		
 	def render_input_field(self,default_value, label_text,desc_text,width,parent_frame,command=None):
 			label_text = label_text+": "
 			self.widget_frames[label_text] = Frame(parent_frame)
@@ -381,12 +380,9 @@ class user_interface_handler:
 			weights_as_list = []
 			for layer in weight_layers:
 				l_layer = []
-				print("L")
 				for w_group in layer:
 					l_group = []
-					print("		G")
-					for w in w_group:
-						print(w)	
+					for w in w_group:	
 						l_group.append(w)
 					l_layer.append(l_group)
 				weights_as_list.append(l_layer)
@@ -395,9 +391,6 @@ class user_interface_handler:
 			
 			new_file = open("saved/nn_"+nn_name+".txt", "a")
 			new_file.write(weights_as_json)
-
-	def load_nn(self):
-		print("n")
 
 	def load_settings(self,value):
 		setting_to_load = self.saved_settings_text.get()
@@ -894,9 +887,7 @@ class neural_network_handler:
 		for after_input_layer in range(1, len(self.nn_neurons)):
 			hidden_neuron_sums = np.dot(np.asarray(self.all_weights[after_input_layer-1]) , self.nn_neurons[after_input_layer-1])
 			if(len(self.biases_weights[after_input_layer-1])!=0):
-				#print("hidden_to_add: ",hidden_neuron_sums, "sh: ",hidden_neuron_sums.shape)
 				bias_vals = (self.biases_for_non_input_layers[after_input_layer-1] * self.biases_weights[after_input_layer-1])
-				#print("bias_vals_adding: ", bias_vals, "sh: ",bias_vals.shape)
 				hidden_neuron_sums += bias_vals
 			self.nn_neurons[after_input_layer] = self.activate_threshold(hidden_neuron_sums, "sigmoid")
 
