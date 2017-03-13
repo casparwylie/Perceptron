@@ -334,8 +334,7 @@ class user_interface_handler:
 		self.save_nn_opt = self.render_option("Save Trained NN",self.save_nn,self.right_opt_col)
 		self.save_nn_opt.config(state="disabled")
 		self.test_input_opt = self.render_option("Test With Input",self.test_input, self.left_opt_col)
-		self.load_nn_opt = self.render_option("Load Trained NN", self.load_nn,self.right_opt_col)
-
+		
 	def render_input_field(self,default_value, label_text,desc_text,width,parent_frame,command=None):
 			label_text = label_text+": "
 			self.widget_frames[label_text] = Frame(parent_frame)
@@ -395,9 +394,6 @@ class user_interface_handler:
 			
 			new_file = open("saved/nn_"+nn_name+".txt", "a")
 			new_file.write(weights_as_json)
-
-	def load_nn(self):
-		print("n")
 
 	def load_settings(self,value):
 		setting_to_load = self.saved_settings_text.get()
@@ -944,10 +940,7 @@ class neural_network_handler:
 
 			if(len(self.biases_weights[weight_layer_count])!=0):
 				current_bias_weight_vals = self.biases_weights[weight_layer_count]
-				#print("bpc_bias: ", current_bias_weight_vals.shape)
-				#print("bpc_bias: ", back_prop_cost_to_sum.shape)
 				self.biases_weights[weight_layer_count] = current_bias_weight_vals - (self.learning_constant * back_prop_cost_to_sum.flatten())
-				#print("bp_newb: ", self.biases_weights[weight_layer_count].shape)
 			input_neuron_vals = np.expand_dims(self.nn_neurons[weight_layer_count],axis=1)
 			full_back_prop_sum_to_input = np.dot(back_prop_cost_to_sum,input_neuron_vals.transpose())
 			current_weight_vals = self.all_weights[weight_layer_count]
