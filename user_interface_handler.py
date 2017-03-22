@@ -9,103 +9,10 @@ import matplotlib.pyplot as plt
 import matplotlib.animation as animation
 from matplotlib import rcParams
 from PIL import Image, ImageTk
+from neural_network_handler import neural_network
+from data_handler import data_processor
 
-class data_preprocessor_handler():
-	
-	def __init__(self, ui):
-		self.user_interface = ui
-
-	def normalise_text_file(self,text_file,target_val_pos,elements_to_ignore,divider):
-		target_val_pos -= 1
-		elements_to_ignore.append(target_val_pos)
-		name_for_new = text_file[0:text_file.rfind(".")]
-		new_txt_file = open("processed_datasets/"+name_for_new+"_new.txt", "a")
-		data_by_row = open("original_datasets/"+text_file, 'r').read().split("\n")
-		for row in data_by_row:
-			row = row.split(",")
-			new_row = []
-			r_count = 0
-			if(len(row)>1):
-				for element in row:
-					if(r_count not in elements_to_ignore):
-						element = element.strip()
-						empty_count = 0
-						if(element.replace(".", "", 1).isdigit()):
-							element = float(element)/divider
-							new_row.append(element)
-					r_count += 1
-				new_row_count = len(new_row)
-				new_row.append(row[target_val_pos])
-				row_str = ','.join(str(e) for e in new_row)
-				row_str += ","
-				new_txt_file.write(row_str)
-		self.user_interface.print_console("Finished processing. There are now " + str(new_row_count) + " inputs/values per row. Excluding the target.")
-
-	def image_dir_to_matrix_txt(self, dirname):
-		new_txt_file = open("processed_datasets/"+dirname+"_new.txt", "a")
-		image_file_names = os.listdir(dirname)
-		for image_file_name in image_file_names:
-			if(image_file_name[0:1] != "."):
-				pre_file_type_loc = image_file_name.rfind(".")
-				image_name_data = image_file_name[0:pre_file_type_loc]
-				target_val = image_name_data.split(",")[1]
-				image_matrix = cv2.imread(dirname+"/"+image_file_name)
-				image_matrix = cv2.cvtColor(image_matrix, cv2.COLOR_BGR2GRAY)
-				c = 0
-				new_txt_file.write(target_val+"")
-				for row_px in range(0,len(image_matrix)):
-					for col_px in range(0,len(image_matrix[0])):
-						new_txt_file.write(str(image_matrix[row_px][col_px]) + ",")
-						c+=1
-	
-class matrix_data_loader_handler:
-	def __init__(self, matrix_dims, to_retrieve, file_name,user_interface):
-		self.user_interface = user_interface
-		self.matrix_width = matrix_dims[0]
-		self.matrix_height = matrix_dims[1]
-		self.input_total = self.matrix_width*self.matrix_height
-		self.to_retrieve = to_retrieve
-		self.file_name = file_name
-		self.user_interface.print_console("Loading "+str(self.to_retrieve)+" items from " + self.file_name + "... \n")
-		self.data_set = open("processed_datasets/"+file_name, 'r').read().replace("\n", ",",1).replace(" ", "",1).split(",")
-		self.matrices = []
-		self.targets = []
-		self.input_divider_val = 1
-		self.max_data_amount = int(len(self.data_set) / (self.input_total+1))
-
-		if(self.to_retrieve == "all"):
-			self.to_retrieve = self.max_data_amount
-
-	def populate_matrices(self):
-		px_count = 0
-		done_msg = "Finished loading data \n "
-		prev_pos_of_matrix = 0
-		target_pos_in_row = -1
-		for i in range(1,self.to_retrieve+1):
-			if(self.user_interface.cancel_training == True):
-				done_msg = "**CANCELLED** \n "
-				break
-			pos_of_matrix = (i*(self.input_total))+i
-			flat_single_item = self.data_set[prev_pos_of_matrix:pos_of_matrix]
-			if(len(flat_single_item)>0):
-				target_val = int(flat_single_item[target_pos_in_row])
-				del flat_single_item[target_pos_in_row]
-				item_as_array = np.asarray(flat_single_item, dtype=np.float32) / self.input_divider_val
-				array_as_matrix = np.reshape(item_as_array,(self.matrix_width,self.matrix_height),order="A")
-				self.matrices.append(array_as_matrix)
-				self.targets.append(target_val)
-				prev_pos_of_matrix = pos_of_matrix
-			if(self.to_retrieve > 10):
-				if(i%(int(self.to_retrieve/5))==0):
-					self.user_interface.print_console("Loaded "+str(i)+"/"+str(self.to_retrieve))
-		self.user_interface.print_console(done_msg)
-
-	def prep_matrix_for_input(self, matrix):
-		matrix_float = matrix.astype(np.float32)
-		matrix_for_input = matrix_float / float(self.input_divider_val)
-		return matrix_for_input
-
-class user_interface_handler:
+class user_interface:
 
 	frame_height = 800
 	frame_width = 1200
@@ -129,6 +36,7 @@ class user_interface_handler:
 		self.can_clear_graph = False
 		self.render_ui_frames()
 		self.render_ui_widgets()
+		self.data_processor = data_processor(self)
 		
 		
 
@@ -205,7 +113,6 @@ class user_interface_handler:
 			
 		ydata = self.g_lines[line][-1].get_ydata()
 		ydata = np.append(ydata,data)
-		#print(ydata)
 		self.g_lines[line][-1].set_ydata(ydata)
 		self.g_lines[line][-1].set_xdata(range(len(ydata)))
 		self.g_axis[line].relim()
@@ -287,7 +194,7 @@ class user_interface_handler:
 	def render_ui_widgets(self):
 		self.render_nn_vis_trigger()
 		
-		icon = ImageTk.PhotoImage(Image.open("resources/perceptron-header.jpg").resize((230, 100), Image.ANTIALIAS))
+		icon = ImageTk.PhotoImage(Image.open("resources/perceptron-header.jpg"))#.resize((230, 100), Image.ANTIALIAS))
 		self.icon_view = Label(self.learn_options_frame,image=icon)
 		self.icon_view.image = icon
 		self.icon_view.pack()
@@ -331,7 +238,7 @@ class user_interface_handler:
 		self.cancel_learning_opt.config(state="disabled")
 		self.clear_graphs_opt = self.render_option("Clear Graphs", self.clear_graphs, self.right_opt_col)
 		self.save_settings_opt = self.render_option("Save Settings",self.save_settings,self.right_opt_col)
-		self.save_nn_opt = self.render_option("Save Trained NN",self.save_nn,self.right_opt_col)
+		self.save_nn_opt = self.render_option("Export Trained NN",self.save_nn,self.right_opt_col)
 		self.save_nn_opt.config(state="disabled")
 		self.test_input_opt = self.render_option("Test With Input",self.test_input, self.left_opt_col)
 		
@@ -380,12 +287,9 @@ class user_interface_handler:
 			weights_as_list = []
 			for layer in weight_layers:
 				l_layer = []
-				print("L")
 				for w_group in layer:
 					l_group = []
-					print("		G")
-					for w in w_group:
-						print(w)	
+					for w in w_group:	
 						l_group.append(w)
 					l_layer.append(l_group)
 				weights_as_list.append(l_layer)
@@ -485,7 +389,7 @@ class user_interface_handler:
 			label_for_minicam.configure(image=tk_miniframe)
 
 			roi_matrix = cv2.resize(roi_matrix, (self.matrix_dims[0],self.matrix_dims[1]))
-			matrix_float = self.matrix_data_loader.prep_matrix_for_input(roi_matrix)
+			matrix_float = self.data_processor.prep_matrix_for_input(roi_matrix)
 			outline_vals = [matrix_float[0,:-1], matrix_float[:-1,-1], matrix_float[-1,::-1], matrix_float[-2:0:-1,0]]
 			outline_sum = np.concatenate(outline_vals).sum()
 			if(int(outline_sum) == 0):
@@ -510,12 +414,11 @@ class user_interface_handler:
 		self.preproccess_window = Toplevel(self.ui_frame,width=300,height=400)
 		self.prepro_original_file = self.render_input_field(".txt", "Dataset File","Enter the name of the text file",self.input_text_length, self.preproccess_window)
 		self.prepro_target_val_pos = self.render_input_field("1", "Target Value Position","Enter position of target value in row",self.input_text_length, self.preproccess_window)
-		self.prepro_values_to_ignore = self.render_input_field(".txt", "Values to Ignore","Enter positions of values to be removed/ignored e ",self.input_text_length, self.preproccess_window)
+		self.prepro_values_to_ignore = self.render_input_field(".txt", "Fields to Ignore","Enter positions of values to be removed/ignored e ",self.input_text_length, self.preproccess_window)
 		self.prepro_divider = self.render_input_field("10", "Minimise Data By","Divide all values by this value",self.input_text_length, self.preproccess_window)
 		self.prepro_opt = self.render_option("PROCCESS", self.start_preprocess, self.preproccess_window)
 
 	def start_preprocess(self):
-		preproccessor_handler = data_preprocessor_handler(self)
 
 		file_name = self.prepro_original_file.get()
 		target_pos = self.prepro_target_val_pos.get()
@@ -531,12 +434,12 @@ class user_interface_handler:
 			error = "Invalid target position"
 		else:
 			target_pos = int(target_pos)
-		if(divider.isdigit()==False):
-			error = "Invalid target position"
+		if(divider != "" and divider.isdigit()==False):
+			error = "Invalid divider"
 		else:
 			divider = int(divider)
 
-		preproccessor_handler.normalise_text_file(file_name,target_pos,values_to_ignore,divider)
+		self.data_processor.normalise_text_file(file_name,target_pos,values_to_ignore,divider)
 
 	def test_input(self):
 		input_str = tkSimpleDialog.askstring("Enter Input", "Enter the name of an image file, text file, enter data manually, or to use camera input enter 'camera': ")
@@ -554,7 +457,7 @@ class user_interface_handler:
 					if(file_type_str == "txt"):
 						input_str = open(input_str, 'r').read()
 					input_data = input_str.split(",")
-					item_as_array = self.matrix_data_loader.prep_matrix_for_input(np.asarray(input_data))
+					item_as_array = self.data_processor.prep_matrix_for_input(np.asarray(input_data))
 					matrix_ready = np.reshape(item_as_array,(self.matrix_dims[0],self.matrix_dims[1]),order="A")	
 					
 				elif(file_type_str in valid_files):
@@ -582,7 +485,6 @@ class user_interface_handler:
 		self.prepare_new_line_graph()
 		self.start_learning_opt.config(state="normal")
 		self.cancel_learning_opt.config(state="disabled")
-		self.load_nn_opt.config(state="normal")
 		self.save_nn_opt.config(state="normal")
 		if(self.input_neuron_count>0):
 			self.test_input_opt.config(state="normal")
@@ -674,7 +576,6 @@ class user_interface_handler:
 		if(self.field_result['success'] ==True):
 			self.start_learning_opt.config(state="disabled")
 			self.cancel_learning_opt.config(state="normal")
-			self.load_nn_opt.config(state="disabled")
 			self.save_nn_opt.config(state="disabled")
 			thread.start_new_thread(self.start_learning_in_thread,())
 		else:
@@ -695,14 +596,14 @@ class user_interface_handler:
 
 			self.curr_dataset_name = field_result['data_file_name']
 			self.matrix_dims = field_result['matrix_dims']
-			self.matrix_data_loader = matrix_data_loader_handler(field_result['matrix_dims'],field_result['to_retrieve'],field_result['data_file_name'],self)
-			self.matrix_data_loader.populate_matrices()
-			self.prev_to_retrieve = self.matrix_data_loader.to_retrieve
-			self.input_neuron_count = self.matrix_data_loader.matrix_width * self.matrix_data_loader.matrix_height
-			self.matrix_data = self.matrix_data_loader.matrices
-			self.matrix_targets = self.matrix_data_loader.targets
+			self.data_processor.load_matrix_data(field_result['matrix_dims'],field_result['to_retrieve'],field_result['data_file_name'],self)
+			self.data_processor.populate_matrices()
+			self.prev_to_retrieve = self.data_processor.to_retrieve
+			self.input_neuron_count = self.data_processor.matrix_width * self.data_processor.matrix_height
+			self.matrix_data = self.data_processor.matrices
+			self.matrix_targets = self.data_processor.targets
 		
-		self.neural_network = neural_network_handler()
+		self.neural_network = neural_network()
 		self.neural_network.initilize_nn(field_result['hidden_layers'],
 				self.input_neuron_count,field_result['output_count'], self.matrix_data,self.matrix_targets,
 				field_result['biases_for_non_input_layers'], field_result['learning_constant'], 
@@ -803,236 +704,3 @@ class user_interface_handler:
 
 				neuron_y += neuron_dist_y
 			neuron_x += neuron_dist_x
-		
-class neural_network_handler:
-
-	#construct object to develop specific network structure
-	def initilize_nn(self, hidden_layers,
-					input_count, output_count, matrix_data,matrix_targets,
-					biases_for_non_input_layers, learning_constant,
-					testing_mode,weight_range,epochs,data_to_test,user_interface):
-
-		self.user_interface = user_interface
-		if(self.user_interface.cancel_training == False):
-			self.user_interface.print_console("\n\n\n--------------------------- \n Constructing neural network \n\n")
-			self.all_weights = []
-			self.nn_neurons = []
-			self.weight_changes = []
-			self.biases_weights = []
-			self.biases_weight_changes = []
-			self.epochs = epochs
-			self.test_data_amount = data_to_test
-			self.matrix_data = matrix_data
-			self.hidden_layers = hidden_layers
-			self.matrix_targets = matrix_targets
-			self.learning_constant = learning_constant
-			self.output_count = output_count
-			self.input_count = input_count
-			self.testing_mode = testing_mode
-			self.biases_for_non_input_layers = biases_for_non_input_layers
-			self.weight_range = weight_range 
-			self.success_records = []
-			if(len(self.matrix_targets)<100):
-				self.is_small_data = True
-			else:
-				self.is_small_data = False
-
-			self.populate_nn_neurons()
-			self.populate_all_weights()
-
-	def populate_nn_neurons(self):
-		nn_inputs = np.zeros(self.input_count)
-		nn_outputs = np.zeros(self.output_count)
-		self.nn_neurons.append(nn_inputs)
-		for i in self.hidden_layers:
-			hidden_layer = np.zeros(i)
-			self.nn_neurons.append(hidden_layer)
-		self.nn_neurons.append(nn_outputs)
-
-	def populate_all_weights(self):
-		for neuron_layer in range(1, len(self.nn_neurons)):
-			layer_length = len(self.nn_neurons[neuron_layer])
-			weight_layer = []
-			weight_changes_layer = []
-			for single_neuron in range(0, layer_length):
-				prev_layer_count = len(self.nn_neurons[neuron_layer-1])
-				neuron_weights = self.initilize_weights(prev_layer_count)
-				weights_change_record_neuron = np.zeros(prev_layer_count)
-		
-				weight_layer.append(neuron_weights)
-				weight_changes_layer.append(weights_change_record_neuron)
-
-			self.all_weights.append(weight_layer)
-			self.weight_changes.append(weight_changes_layer)
-
-		for layer_count in range(0, len(self.biases_for_non_input_layers)):
-			single_bias_weights = []
-			single_bias_weights_change = []
-			if(self.biases_for_non_input_layers[layer_count]!=0):
-				bias_input_count = len(self.nn_neurons[layer_count+1])
-				single_bias_weights = self.initilize_weights(bias_input_count)
-				single_bias_weights_change = np.zeros(bias_input_count)
-			self.biases_weights.append(single_bias_weights)
-			self.biases_weight_changes.append(single_bias_weights_change)
-
-	def initilize_weights(self,size):
-		if(len(self.weight_range)==1):
-			upper_bound = self.weight_range[0]
-			lower_bound = upper_bound
-		else:
-			upper_bound = self.weight_range[1]
-			lower_bound = self.weight_range[0]
-
-		return np.random.uniform(low=lower_bound, high=upper_bound, size=(size))
-
-	def feed_forward(self, matrix):
-		self.populate_input_layer(matrix)
-		for after_input_layer in range(1, len(self.nn_neurons)):
-			hidden_neuron_sums = np.dot(np.asarray(self.all_weights[after_input_layer-1]) , self.nn_neurons[after_input_layer-1])
-			if(len(self.biases_weights[after_input_layer-1])!=0):
-				#print("hidden_to_add: ",hidden_neuron_sums, "sh: ",hidden_neuron_sums.shape)
-				bias_vals = (self.biases_for_non_input_layers[after_input_layer-1] * self.biases_weights[after_input_layer-1])
-				#print("bias_vals_adding: ", bias_vals, "sh: ",bias_vals.shape)
-				hidden_neuron_sums += bias_vals
-			self.nn_neurons[after_input_layer] = self.activate_threshold(hidden_neuron_sums, "sigmoid")
-
-	def populate_input_layer(self, data):
-		value_count = 0
-		if(type(data[0]) is not int):
-			self.nn_neurons[0] = data.flatten()
-		else:
-			self.nn_neurons[0] = np.array(data)
-	testing_output_mode = False
-	test_counter = 0
-	correct_count = 0
-	error_by_1000 = 0
-	error_by_1000_counter = 1
-	output_error_total = 0
-	
-	def back_propagate(self, target_val,repeat_count):
-
-		if(len(self.nn_neurons[-1])>1 and type(target_val) is int):
-			target_vector = self.populate_target_vector(target_val)
-		else:
-			target_vector = target_val
-		if(len(self.nn_neurons[-1])>1):
-			outputs_as_list = self.nn_neurons[-1].tolist()
-			success_condition = (outputs_as_list.index(max(outputs_as_list))==target_val)
-		else:
-			success_condition = (round(self.nn_neurons[-1][0]) == target_vector)
-		if(self.test_counter >= len(self.matrix_data)-self.test_data_amount):
-			if(success_condition == True):
-				self.correct_count += 1
-		if(success_condition == False):
-				self.error_by_1000 += 1
-		if(self.error_by_1000_counter % 1000 == 0):
-			self.user_interface.animate_graph_figures(0,self.error_by_1000/10)
-			self.error_by_1000 = 0
-			self.error_by_1000_counter = 0
-		for weight_layer_count in range(len(self.all_weights)-1,-1,-1):
-			weight_neuron_vals = np.expand_dims(self.nn_neurons[weight_layer_count+1],axis=1)
-			target_vector = np.expand_dims(target_vector,axis=1)
-			activated_to_sum_step = weight_neuron_vals * (1-weight_neuron_vals)
-			if(weight_layer_count == len(self.all_weights)-1):
-				back_prop_cost_to_sum = (weight_neuron_vals - target_vector) * activated_to_sum_step
-			else:
-				back_prop_cost_to_sum = np.dot(np.asarray(self.all_weights[weight_layer_count+1]).transpose(),back_prop_cost_to_sum) * activated_to_sum_step
-
-			if(len(self.biases_weights[weight_layer_count])!=0):
-				current_bias_weight_vals = self.biases_weights[weight_layer_count]
-				self.biases_weights[weight_layer_count] = current_bias_weight_vals - (self.learning_constant * back_prop_cost_to_sum.flatten())
-			input_neuron_vals = np.expand_dims(self.nn_neurons[weight_layer_count],axis=1)
-			full_back_prop_sum_to_input = np.dot(back_prop_cost_to_sum,input_neuron_vals.transpose())
-			current_weight_vals = self.all_weights[weight_layer_count]
-			new_weight_vals = current_weight_vals - (self.learning_constant * full_back_prop_sum_to_input)
-			self.all_weights[weight_layer_count] = new_weight_vals
-	
-		self.test_counter += 1
-		self.error_by_1000_counter += 1
-
-	def train(self):
-		if(self.user_interface.cancel_training == False):
-			success_list = []
-			hidden_layer_str = ""
-			for layerc in self.hidden_layers:
-				hidden_layer_str += str(layerc)+","
-			hidden_layer_str = hidden_layer_str[0:-1]
-			cancel_training = False
-			self.user_interface.print_console(" **TRAINING** \n")
-			self.user_interface.print_console("With learning rate: " + str(self.learning_constant))
-			self.user_interface.print_console("With hidden layers: " + str(hidden_layer_str))
-			self.user_interface.print_console("With test amount by epoch size: " + str(self.test_data_amount)+"/"+str(len(self.matrix_targets)))
-			self.user_interface.print_console("With epoch count: " + str(self.epochs))
-
-			if(self.testing_mode == True):
-				self.repeat_count = 5000
-
-			epoch_times = []
-			for epoch in range(1,self.epochs+1):
-				pre_epoch_time = time.time()
-				matrix_count = 0
-				for matrix in self.matrix_data:
-					if(self.user_interface.cancel_training == True):
-						break
-					target_val = self.matrix_targets[matrix_count]
-					self.feed_forward(matrix)
-					self.back_propagate(target_val,epoch)
-					matrix_count += 1
-				if(self.user_interface.cancel_training == True):
-					break
-
-				success_p = (float(self.correct_count)/float(self.test_data_amount))*100
-				self.user_interface.animate_graph_figures(1,success_p)
-				e_note_str = " (ep. "+str(epoch)+")"
-
-				if(self.is_small_data == False):
-					self.user_interface.update_canvas_info_label("Latest Success",str(success_p)+"%"+e_note_str)
-				success_list.append(success_p)
-				self.test_counter = 0
-				self.correct_count = 0
-				post_epoch_time = time.time() - pre_epoch_time
-				if(self.is_small_data == False):
-					self.user_interface.update_canvas_info_label("Epoch Duration",str(round(post_epoch_time,3))+"s "+e_note_str)
-				epoch_times.append(post_epoch_time)
-
-			if(len(success_list)>0):
-				av_success = sum(success_list)/len(success_list)
-				highest_success = max(success_list)
-				av_epoch_time = sum(epoch_times)/len(epoch_times)
-			else:
-				av_success = "N/A"
-				highest_success = "N/A"
-				av_epoch_time = "N/A"
-			training_done_msg = "**FINISHED**"
-			if(self.user_interface.cancel_training == True):
-				training_done_msg = "**CANCELLED**"
-			else:
-				self.user_interface.cancel_learning()
-			self.user_interface.print_console(training_done_msg)
-			self.user_interface.print_console("AVERAGE SUCCESS: " + str(av_success) + "%")
-			self.user_interface.print_console("HIGHEST SUCCESS: " + str(highest_success) + "%")
-			self.user_interface.print_console("TOTAL TIME: " + str(sum(epoch_times,5)) + "s")
-			self.user_interface.print_console("AVERAGE EPOCH TIME: " + str(round(av_epoch_time,5)) + "s")
-
-	def activate_threshold(self,value, type):
-		if(type == "step"):
-			if(value>=0.5):
-				return 1
-			else:
-				return 0
-		elif(type == "sigmoid"):
-			return 1/(1 + np.exp(-value))
-
-	def populate_target_vector(self,target):
-		vector = []
-		for i in range(0,self.output_count):
-			vector.append(0)
-		vector[target] = 1
-		return vector
-
-def main():
-	tk_main = Tk()
-	user_interface = user_interface_handler(tk_main)
-	tk_main.mainloop()
-	
-main()
