@@ -1,4 +1,4 @@
-NOTE: This is an incomplete project. Expect bugs!
+ NOTE: This is an incomplete project. Expect bugs! I may decide to spend a lot more time on it if people persist giving it positive attention.
 
 # Perceptron
 A flexible artificial neural network builder for, to analysis performance, and optimise the best model. 
