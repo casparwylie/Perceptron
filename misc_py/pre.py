@@ -76,7 +76,9 @@ class data_preprocessor_handler:
             r_count = 0
             for element in row:
                 if(r_count not in elements_to_ignore):
-                    new_row.append(element.strip())
+                    if(element.strip().isdigit()):
+                        element = float(element)/255
+                    new_row.append(str(element))
                 r_count += 1
             new_row.append(row[target_val_pos])
             row_str = ','.join(str(e) for e in new_row)
@@ -89,11 +91,22 @@ class data_preprocessor_handler:
         img = clahe.apply(img)
         cv2.imshow('c',img)
 
+
+
+def real_strip(string):
+        discount_chars = ["'", '"']
+        string = string.strip()
+        for char in discount_chars:
+            if(string[0] == char and string[-1] == char):
+                string = string[1:-1]
+                break
+        return string
+
 def main():
-    data_handler = data_preprocessor_handler()
+    print(real_strip('"testsdgheh"'))
+    #data_handler = data_preprocessor_handler()
    # data_handler.image_dir_to_matrix_txt("test-_imgs")
-    #data_handler.format("breast_cancer_data.txt")
-    data_handler.show_matrices_from_file("bc_new.txt")
+   # data_handler.normalise_text_file("digits.txt")
     #data_handler.format("train.txt")
    # data_handler.show_eq("2,2.png")
    # cv2.waitKey(0)

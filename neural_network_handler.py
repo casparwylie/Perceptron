@@ -7,7 +7,7 @@ class neural_network:
 	def initilize_nn(self, hidden_layers,
 					input_count, output_count, matrix_data,matrix_targets,
 					biases_for_non_input_layers, learning_constant,
-					testing_mode,weight_range,epochs,data_to_test,user_interface):
+					testing_mode,weight_range,epochs,data_to_test,t_type,data_total,user_interface):
 
 		self.user_interface = user_interface
 		if(self.user_interface.cancel_training == False):
@@ -18,7 +18,9 @@ class neural_network:
 			self.biases_weights = []
 			self.biases_weight_changes = []
 			self.epochs = epochs
-			self.test_data_amount = data_to_test
+			divider_to_test = float(data_to_test)/100.0
+			self.test_data_amount = int(round(divider_to_test*data_total))
+			self.t_type = t_type
 			self.matrix_data = matrix_data
 			self.hidden_layers = hidden_layers
 			self.matrix_targets = matrix_targets
@@ -92,11 +94,8 @@ class neural_network:
 			self.nn_neurons[after_input_layer] = self.activate_threshold(hidden_neuron_sums, "sigmoid")
 
 	def populate_input_layer(self, data):
-		value_count = 0
-		if(type(data[0]) is not int):
-			self.nn_neurons[0] = data.flatten()
-		else:
-			self.nn_neurons[0] = np.array(data)
+		self.nn_neurons[0] = np.array(data)
+
 	testing_output_mode = False
 	test_counter = 0
 	correct_count = 0
@@ -104,16 +103,18 @@ class neural_network:
 	error_by_1000_counter = 1
 	output_error_total = 0
 	
-	def back_propagate(self, target_val,repeat_count):
+	def back_propagate(self, target_val,repeat_count,t_type):
 
-		if(len(self.nn_neurons[-1])>1 and type(target_val) is int):
-			target_vector = self.populate_target_vector(target_val)
+		if(t_type=="B"):
+			target_vector = self.user_interface.data_processor.populate_target_vector(target_val[0],self.output_count)
 		else:
 			target_vector = target_val
+
 		if(len(self.nn_neurons[-1])>1):
 			outputs_as_list = self.nn_neurons[-1].tolist()
-			success_condition = (outputs_as_list.index(max(outputs_as_list))==target_val)
+			success_condition = (outputs_as_list.index(max(outputs_as_list))==int(target_val[0]))
 		else:
+
 			success_condition = (round(self.nn_neurons[-1][0]) == target_vector)
 		if(self.test_counter >= len(self.matrix_data)-self.test_data_amount):
 			if(success_condition == True):
@@ -171,9 +172,9 @@ class neural_network:
 				for matrix in self.matrix_data:
 					if(self.user_interface.cancel_training == True):
 						break
-					target_val = self.matrix_targets[matrix_count]
+					target_vals = self.matrix_targets[matrix_count]
 					self.feed_forward(matrix)
-					self.back_propagate(target_val,epoch)
+					self.back_propagate(target_vals,epoch,self.t_type)
 					matrix_count += 1
 				if(self.user_interface.cancel_training == True):
 					break
@@ -220,11 +221,6 @@ class neural_network:
 		elif(type == "sigmoid"):
 			return 1/(1 + np.exp(-value))
 
-	def populate_target_vector(self,target):
-		vector = []
-		for i in range(0,self.output_count):
-			vector.append(0)
-		vector[target] = 1
-		return vector
+
 
 
