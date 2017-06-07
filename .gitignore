@@ -3,3 +3,5 @@
 .DS_Store
 
 /.eggs/
+/original_datasets/
+/processed_datasets/
