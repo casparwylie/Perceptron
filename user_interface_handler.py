@@ -19,14 +19,15 @@ class user_interface:
 
 	def __init__(self, tk_main):
 		self.tk_main = tk_main
+		self.main_bg="#81899f"
 		self.ui_frame = Frame(self.tk_main)
-		self.ui_frame.configure(background="white")
+		self.ui_frame.configure(background=self.main_bg)
 		self.ui_frame.pack()
 		self.tk_main.title("Perceptron") 
-		self.tk_main.configure(background="white")
+		self.tk_main.configure(background=self.main_bg)
 		self.tk_main.minsize(width=self.frame_width, height=self.frame_height)
 		self.tk_main.maxsize(width=self.frame_width, height=self.frame_height)
-		self.font_face = "Helvetica"
+		self.font_face = "Arial"
 		self.main_font_size = 13
 		self.tk_main.protocol('WM_DELETE_WINDOW', self.quit_all)
 		self.canvas_height = 500
@@ -36,6 +37,7 @@ class user_interface:
 		self.canvas_labels = []
 		self.settings_file_name = "resources/settings.json"
 		self.can_clear_graph = False
+		self.opt_bgcolor = "#424e6f"
 		self.data_processor = data_processor(self)
 		self.render_ui_frames()
 		self.render_ui_widgets()
@@ -46,21 +48,22 @@ class user_interface:
 
 	def render_ui_frames(self):
 
-		self.learn_options_frame = Frame(self.ui_frame,width=500,background="white")
+		self.learn_options_frame = Frame(self.ui_frame,width=500,background=self.main_bg)
 		self.learn_options_frame.pack(fill=BOTH,side=LEFT)
 		#self.console_frame = Frame(self.ui_frame,bg="grey",height=300,width=400)
 		#self.console_frame.pack()
 		self.c_scrollbar = Scrollbar(self.tk_main)
 		self.c_scrollbar.pack(side=RIGHT, fill=Y)
 
-		self.lower_frame = Frame(self.ui_frame,background="white")
+		self.lower_frame = Frame(self.ui_frame,background=self.main_bg)
 		self.lower_frame.pack(side=BOTTOM, fill=BOTH)
-		self.console_list_box = Text(self.lower_frame,bg="grey",height=16,width=34,borderwidth=0, highlightthickness=0,font=("courier bold", 10))
-		self.console_list_box.pack(padx=3,ipady=20,ipadx=10,side=LEFT,fill=Y)
+		self.console_list_box = Text(self.lower_frame,height=16,width=34,borderwidth=0, highlightthickness=0,bg="#212737",fg="green",font=("courier",9))
+		self.console_list_box.pack(ipady=20,ipadx=10,side=LEFT,fill=Y)
 		self.console_list_box.config(yscrollcommand=self.c_scrollbar.set)
 		self.console_list_box.configure(state="disabled")
+		self.console_list_box.configure(wrap=WORD)
 		self.c_scrollbar.config(command=self.console_list_box.yview)
-		self.tk_nn_visual_canvas = Canvas(self.ui_frame, width=self.canvas_width, height=self.canvas_height,background="grey")
+		self.tk_nn_visual_canvas = Canvas(self.ui_frame, width=self.canvas_width, height=self.canvas_height,background="#424e6f",highlightthickness=0)
 		self.tk_nn_visual_canvas.pack(side=RIGHT)
 
 		self.g_figures = range(2)
@@ -77,15 +80,15 @@ class user_interface:
 
 	def render_graph(self,title,xlabel,ylabel,line_num,col):
 
-		self.g_figures[line_num] =  plt.figure()
-		self.g_axis[line_num] = self.g_figures[line_num].add_subplot(111)
+		self.g_figures[line_num] =  plt.figure(facecolor=self.main_bg)
+		self.g_axis[line_num] = self.g_figures[line_num].add_subplot(111,axisbg="#b3b8c5")
 		self.g_axis[line_num].set_ylabel(ylabel)
 		self.g_axis[line_num].set_xlabel(xlabel)
-		self.g_figures[line_num].suptitle(title)
+		self.g_figures[line_num].text(0.5,0.97,title,horizontalalignment='center',fontsize=9)
 		self.g_axis[line_num].get_yaxis().set_visible(False)
 		self.g_axis[line_num].get_xaxis().set_visible(False)
 		self.g_canvas[line_num] = FigureCanvasTkAgg(self.g_figures[line_num], master=self.lower_frame)
-		self.g_canvas[line_num].get_tk_widget().config(width=360,height=280)
+		self.g_canvas[line_num].get_tk_widget().config(width=340,height=280)
 		self.g_canvas[line_num].get_tk_widget().pack(side=LEFT,fill=X)
 
 
@@ -96,9 +99,9 @@ class user_interface:
 		label_y = 30
 		for label_name in self.canvas_label_names:
 			self.canvas_info_label_vals[label_name] = StringVar()
-			self.canvas_info_label_vals[label_name].set(label_name+":")
-			self.canvas_info_labels[label_name] = Label(self.tk_nn_visual_canvas, textvariable=self.canvas_info_label_vals[label_name],font=(self.font_face, self.main_font_size),bg="grey")
-			self.canvas_info_labels[label_name].place(x=self.canvas_width-230, y=self.canvas_height-label_y)
+			self.canvas_info_label_vals[label_name].set(label_name+": N/A")
+			self.canvas_info_labels[label_name] = Label(self.mid_labels_frame, textvariable=self.canvas_info_label_vals[label_name],font=(self.font_face, self.main_font_size),bg=self.main_bg)
+			self.canvas_info_labels[label_name].pack(side=BOTTOM)
 			label_y += 20
 
 	def update_canvas_info_label(self,label_name,val):
@@ -122,11 +125,12 @@ class user_interface:
 		self.g_axis[line].relim()
 		self.g_axis[line].autoscale_view()
 
-		if(line==1): 
-			if(data!=self.prev_line_1_data):
+		'''	if(line==1): 
+			if(round(data)!=self.prev_line_1_data):
+				data = round(data,2)
 				self.all_g1_annotations.append(self.g_axis[line].annotate(str(data)+"%",(len(ydata)-1,data)))
-				self.all_g1_annotations[-1].set_fontsize(9)
-			self.prev_line_1_data = data
+				self.all_g1_annotations[-1].set_fontsize(7)
+			self.prev_line_1_data = round(data)'''
 
 		self.g_figures[line].canvas.draw()
 
@@ -207,16 +211,15 @@ class user_interface:
 	def render_ui_widgets(self):
 		self.render_nn_vis_trigger()
 		
-		icon = ImageTk.PhotoImage(Image.open("resources/perceptron-header.jpg"))#.resize((230, 100), Image.ANTIALIAS))
-		self.icon_view = Label(self.learn_options_frame,image=icon)
+		icon = ImageTk.PhotoImage(Image.open("resources/perceptron-header.png").resize((230, 100), Image.ANTIALIAS))
+		self.icon_view = Label(self.learn_options_frame,image=icon,highlightthickness=0,bg=self.main_bg)
 		self.icon_view.image = icon
 		self.icon_view.pack()
 	
 		self.choose_settings_frame = Frame(self.learn_options_frame)
 		self.choose_settings_frame.pack()
 		self.render_settings_opts()
-
-		self.render_canvas_info_labels()
+		
 
 		self.all_drops = {}
 		self.input_fields = {}
@@ -235,16 +238,19 @@ class user_interface:
 		self.input_fields["bias_vals"] = self.render_input_field(self.default_bias_str, "Bias Values", "List must match hidden layer count plus output, but enter 0 for no bias",self.input_text_length,self.learn_options_frame,command=self.render_nn_vis_trigger)
 		self.input_fields["learning_rate"] = self.render_input_field("0.5", "Learning Rate","Enter decimal or integer",self.input_text_length,self.learn_options_frame)
 		self.input_fields["weight_range"] = self.render_input_field("-1,1", "Weight Ranges","Enter one value (or two for a range) for initial weight values",self.input_text_length, self.learn_options_frame)
-		self.input_fields["epochs"] = self.render_input_field("10", "Epochs","Total number of iterations through all data loaded",self.input_text_length, self.learn_options_frame)
+		self.input_fields["epochs"] = self.render_input_field("100", "Dataset Iterations","Total number of iterations through all data loaded",self.input_text_length, self.learn_options_frame)
 		self.input_fields["test_data_partition"] = self.render_input_field("10", "Data for Testing","Amount of data to partition from dataset for result testing",self.input_text_length, self.learn_options_frame)
 		
-		self.lower_sect = Frame(self.learn_options_frame,background="white")
+		self.mid_labels_frame = Frame(self.learn_options_frame,bg=self.main_bg)
+		self.mid_labels_frame.pack(expand=True,fill=BOTH)
+		self.render_canvas_info_labels()
+		self.lower_sect = Frame(self.learn_options_frame,background=self.main_bg)
 		self.lower_sect.pack(expand=True,fill=BOTH)
-		self.opt_cols = Frame(self.lower_sect)
+		self.opt_cols = Frame(self.lower_sect,bg="red")
 		self.opt_cols.pack(side=TOP,expand=True)
-		self.left_opt_col = Frame(self.opt_cols,background="white")
+		self.left_opt_col = Frame(self.opt_cols,background=self.main_bg)
 		self.left_opt_col.pack(side=LEFT)
-		self.right_opt_col = Frame(self.opt_cols,background="white")
+		self.right_opt_col = Frame(self.opt_cols,background=self.main_bg)
 		self.right_opt_col.pack(side=RIGHT)
 
 		self.start_learning_opt = self.render_option("Start Learning", self.start_learning_ui_request, self.left_opt_col)
@@ -256,43 +262,53 @@ class user_interface:
 		self.save_nn_opt.config(state="disabled")
 		self.test_input_opt = self.render_option("Test With Input",self.test_input, self.left_opt_col)
 		
+
+		self.print_console("Welcome to Perceptron. To get started, preprocess a dataset and then design a neural network for it to use. For more information, see the README file. Click this console to scroll it.")
+
 	def render_input_field(self,default_value, label_text,desc_text,width,parent_frame,command=None,drop=None):
 			label_text = label_text+": "
-			self.widget_frames[label_text] = Frame(parent_frame,background="white")
+			self.widget_frames[label_text] = Frame(parent_frame,background=self.main_bg)
 			self.widget_frames[label_text].pack(fill=X,expand=False)
 
-			desc_frame = Frame(self.widget_frames[label_text], width=50, height=0,background="white")
+			desc_frame = Frame(self.widget_frames[label_text], width=50, height=0,background=self.main_bg)
 			desc_frame.pack(fill=None,side=BOTTOM,expand=False)
 
 			if(drop!=None):
 				input_widget_val = StringVar(self.tk_main)
 				input_widget = OptionMenu(self.widget_frames[label_text], input_widget_val,command=command,*drop)
+				input_widget.config(bg=self.opt_bgcolor)
+				input_widget.config(relief=FLAT)
+				input_widget["menu"].config(bg=self.opt_bgcolor)
+				input_widget.config(highlightthickness=0)
+				input_widget["menu"].config(bg=self.opt_bgcolor)
+				input_widget.config(foreground="white")
 				self.all_drops[label_text] = input_widget
 				input_widget.config(width=15)
 				input_widget_val.set(drop[default_value])
 			else:
-				input_widget = Entry(self.widget_frames[label_text], width=width)
+				input_widget = Entry(self.widget_frames[label_text], width=38-len(label_text),bg="#545f7d",font=(self.font_face,11))
 				input_widget.insert(0,str(default_value))
 				if(command!=None):
 					input_widget.bind("<KeyRelease>", command)
 			
-			input_widget.pack(side=RIGHT)
+			input_widget.pack(side=RIGHT,padx=3,ipady=3)
 
 			if(drop!=None): input_widget = input_widget_val
 
-			self.input_labels[label_text] = Label(self.widget_frames[label_text], text=label_text,background="white",font=(self.font_face, self.main_font_size))
+			self.input_labels[label_text] = Label(self.widget_frames[label_text], text=label_text,background=self.main_bg,font=(self.font_face, self.main_font_size))
 			self.input_labels[label_text].pack(side=LEFT)
 			self.widget_frames[label_text].bind("<Enter>", self.toggle_desc_label)
 			self.widget_frames[label_text].bind("<Leave>", self.toggle_desc_label)
-			self.input_descs[label_text] = Label(desc_frame, text="*"+desc_text,background="white", font=(self.font_face, 1), fg="white",wraplength=210)
+			self.input_descs[label_text] = Label(desc_frame, text="*"+desc_text,background=self.main_bg, font=(self.font_face, 1), fg=self.main_bg,wraplength=210)
 			self.input_descs[label_text].pack(side=BOTTOM)
 			self.input_descs_vis[label_text] = 0
 			return input_widget
 
-	def render_option(self,text, command,parent_frame,side=None,anchor=None,width=None):
-		if(width==None): width = 12
-		option = Button(parent_frame, text=text, command=command,width=width)
-		option.pack(side=side,anchor=anchor)
+	def render_option(self,text, command,parent_frame,side=None,anchor=None,width=None,bg=None):
+		if(width==None): width = 14
+		if(bg==None): bg = self.opt_bgcolor
+		option = Button(parent_frame, text=text, command=command,relief=FLAT,width=width, bg=bg,bd=3,foreground="white")
+		option.pack(side=side,anchor=anchor,padx=3,pady=3)
 		return option
 
 	def update_expected_nn_io_fields(self,event=None):
@@ -302,7 +318,7 @@ class user_interface:
 			t_type = dataset[0]
 			sample_dataset_row = dataset[1].split(",")
 			self.expected_input_count = len(sample_dataset_row)-1
-			self.expected_hidden_count = int(round(self.expected_input_count/2))
+			self.expected_hidden_count = int(round(math.sqrt(int(round(self.expected_input_count))))+10)
 			if(t_type[1]!="B"):
 				self.expected_output_count = len(sample_dataset_row[-1].split("/"))
 			else:
@@ -318,14 +334,13 @@ class user_interface:
 			self.render_nn_vis_trigger(event=True)
 
 
-
 	def toggle_desc_label(self, event):
 		label_text = event.widget.winfo_children()[2].cget("text")
 		if(self.input_descs_vis[label_text] % 2 ==0):
 			self.input_descs[label_text].configure(fg="#60606b")
 			self.input_descs[label_text].configure(font=(self.font_face, 10))
 		else:
-			self.input_descs[label_text].configure(fg="white")
+			self.input_descs[label_text].configure(fg=self.main_bg)
 			self.input_descs[label_text].configure(font=(self.font_face, 1))
 		self.input_descs_vis[label_text] += 1
 
@@ -368,7 +383,13 @@ class user_interface:
 				saved_settings.append(setting)
 		self.saved_settings_text = StringVar(self.tk_main)
 		self.saved_settings_opts = OptionMenu(self.choose_settings_frame, self.saved_settings_text,command=self.load_settings,*saved_settings)
-		self.saved_settings_opts.config(width=15)
+		self.saved_settings_opts.config(width=16)
+		self.saved_settings_opts.config(bg=self.opt_bgcolor)
+		self.saved_settings_opts["menu"].config(bg=self.opt_bgcolor)
+		self.saved_settings_opts.config(foreground="white")
+		self.saved_settings_opts.config(highlightthickness=0)
+		self.saved_settings_opts["menu"].config(foreground="white")
+		self.saved_settings_opts.config(relief=FLAT)
 		self.saved_settings_opts.pack()
 		self.saved_settings_text.set(saved_settings[0])
 
@@ -447,12 +468,12 @@ class user_interface:
 			label_for_minicam.imgtk = tk_miniframe
 			label_for_minicam.configure(image=tk_miniframe)
 
-			roi_matrix = cv2.resize(roi_matrix, (self.matrix_dims[0],self.matrix_dims[1]))
+			roi_matrix = cv2.resize(roi_matrix, (28,28))
 			matrix_float = self.data_processor.prep_matrix_for_input(roi_matrix)
 			outline_vals = [matrix_float[0,:-1], matrix_float[:-1,-1], matrix_float[-1,::-1], matrix_float[-2:0:-1,0]]
 			outline_sum = np.concatenate(outline_vals).sum()
 			if(int(outline_sum) == 0):
-				self.neural_network.feed_forward(matrix_float)
+				self.neural_network.feed_forward(matrix_float.flatten())
 				output_neurons = self.neural_network.nn_neurons[-1].tolist()
 				max_val = max(output_neurons)
 				if(max_val > 0.9):
@@ -472,16 +493,16 @@ class user_interface:
 
 	def preprocess_data_render(self):
 		self.preprocess_window = Toplevel(self.ui_frame,width=300,height=400)
-		self.preprocess_form = Frame(self.preprocess_window,background="white")
+		self.preprocess_form = Frame(self.preprocess_window,background=self.main_bg)
 		self.preprocess_form.pack(side=LEFT, fill=BOTH)
 
-		self.preprocess_inter_viewer = Frame(self.preprocess_window)
+		self.preprocess_inter_viewer = Frame(self.preprocess_window,bg=self.main_bg)
 		self.preprocess_inter_viewer.pack(side=RIGHT, fill=BOTH)
-		self.inter_viewer_header= Label(self.preprocess_inter_viewer, text="Samples of processed data...",font=(self.font_face, self.main_font_size))
+		self.inter_viewer_header= Label(self.preprocess_inter_viewer, text="Samples of processed data...",font=(self.font_face, self.main_font_size),bg=self.main_bg)
 		self.inter_viewer_header.pack()
 		self.v_scrollbar = Scrollbar(self.tk_main)
 		self.v_scrollbar.pack(side=RIGHT, fill=Y)
-		self.inter_viewer_box = Text(self.preprocess_inter_viewer,bg="grey",height=16,width=100,borderwidth=0, highlightthickness=0,font=("courier bold", 10))
+		self.inter_viewer_box = Text(self.preprocess_inter_viewer,bg="#b3b8c5",height=16,width=100,borderwidth=0, highlightthickness=0,font=("courier bold", 10))
 		self.inter_viewer_box.pack(padx=3,ipady=20,ipadx=10,side=RIGHT,fill=Y)
 		self.inter_viewer_box.config(yscrollcommand=self.v_scrollbar.set)
 		self.inter_viewer_box.configure(state="disabled")
@@ -501,7 +522,7 @@ class user_interface:
 		self.prepro["fields_to_ignore"] = self.render_input_field("", "Fields to Ignore","Enter position of fields to be removed/ignored (where first field is 0) ",self.input_text_length,self.preprocess_form,command=self.update_prepro_viewer_for_struct)
 		
 		self.prepro["fields_to_min"] = self.render_input_field("", "Fields For Minimisation","Enter position of fields that need minimising (where first field is 0)",self.input_text_length,self.preprocess_form,command=self.add_min_field)
-		self.prepro_mins_frame = Frame( self.preprocess_form)
+		self.prepro_mins_frame = Frame( self.preprocess_form,bg=self.main_bg)
 		self.prepro_mins_frame.pack(fill=BOTH)
 
 		self.prepro["found_alphas_trans"] = {}
@@ -512,7 +533,7 @@ class user_interface:
 		self.prepro["target_val_pos"] = self.render_input_field("", "Target position(s)","Enter position of fields that are target values",self.input_text_length,self.preprocess_form,command=self.update_prepro_viewer_for_struct)
 		self.prepro["target_type"] = self.render_input_field(0,"Target Value Type","Choose binary or numeric",5,self.preprocess_form,drop=target_types, command=self.prepro_vb_change)
 		
-		self.prepro_vb_frame = Frame(self.preprocess_form)
+		self.prepro_vb_frame = Frame(self.preprocess_form,bg=self.main_bg)
 		self.prepro_vb_frame.pack(fill=BOTH)
 		self.prepro["bin_range"] = None
 
@@ -524,7 +545,7 @@ class user_interface:
 		self.preprocess_data_render()
 
 	def render_trans_alpha_window(self,event=None):
-		self.prepro_transAN_frame = Toplevel( self.ui_frame,width=200,height=200)
+		self.prepro_transAN_frame = Toplevel( self.ui_frame,width=200,height=200,bg=self.main_bg)
 		self.prepro_transAN_frame.protocol('WM_DELETE_WINDOW', self.unset_alpha_fields)
 		has_found_alphas = False
 		for field in self.data_processor.found_alphas:
@@ -622,43 +643,43 @@ class user_interface:
 		self.render_dataset_opts()
 
 	def test_input(self):
-		input_str = tkSimpleDialog.askstring("Enter Input", "Enter the name of an image file, text file, enter data manually, or to use camera input enter 'camera': ")
+		input_str = tkSimpleDialog.askstring("Enter Input", "Enter the name of an image file, text file, enter row data manually: ")
 		if(input_str):
 			file_type_pos = input_str.rfind(".")
 			valid_files = ["png","jpg","txt"]
 			file_type_str = ""
-			if(input_str == "camera"):
+			'''if(input_str == "camera"):
 				self.render_camera()
-			else:
-				if(file_type_pos != -1):
-					file_type_str = input_str[file_type_pos+1:]
+			else:'''
+			if(file_type_pos != -1):
+				file_type_str = input_str[file_type_pos+1:]
+			
+			if(file_type_str not in valid_files or file_type_str == "txt"):
+				if(file_type_str == "txt"):
+					input_str = open(input_str, 'r').read()
+				input_data = input_str.split(",")
+				matrix_ready = self.data_processor.prep_matrix_for_input(np.asarray(input_data))
 				
-				if(file_type_str not in valid_files or file_type_str == "txt"):
-					if(file_type_str == "txt"):
-						input_str = open(input_str, 'r').read()
-					input_data = input_str.split(",")
-					item_as_array = self.data_processor.prep_matrix_for_input(np.asarray(input_data))
-					matrix_ready = np.reshape(item_as_array,(self.matrix_dims[0],self.matrix_dims[1]),order="A")	
-					
-				elif(file_type_str in valid_files):
-					image_matrix = cv2.imread(file_name)
-					image_matrix = cv2.cvtColor(image_matrix, cv2.COLOR_BGR2GRAY)
-					image_matrix = cv2.resize(image_matrix, (self.matrix_dims[0],self.matrix_dims[1]))
-					matrix_ready = self.matrix_data_loader.prep_matrix_for_input(image_matrix)
-				else:
-					output_pos_result = -1
-					self.print_console("**ERROR: invalid test input")
+			elif(file_type_str in valid_files):
+				image_matrix = cv2.imread(file_name)
+				image_matrix = cv2.cvtColor(image_matrix, cv2.COLOR_BGR2GRAY)
+				image_matrix = cv2.resize(image_matrix, (self.matrix_dims[0],self.matrix_dims[1]))
+				matrix_ready = self.matrix_data_loader.prep_matrix_for_input(image_matrix)
+			else:
+				output_pos_result = -1
+				self.print_console("**ERROR: invalid test input")
 
-				self.neural_network.feed_forward(matrix_ready)
-				output_neurons = self.neural_network.nn_neurons[-1].tolist()
-				if(len(output_neurons)>1):
-					output_pos_result = output_neurons.index(max(output_neurons))
-				else:
-					output_pos_result = output_neurons[0]
+			self.neural_network.feed_forward(matrix_ready)
+			output_neurons = self.neural_network.nn_neurons[-1].tolist()
+			if(len(output_neurons)>1):
+				print(output_neurons)
+				output_pos_result = output_neurons.index(max(output_neurons))
+			else:
+				output_pos_result = output_neurons[0]
 
 
-				if(output_pos_result != -1):
-					self.print_console("**OUTPUT RESULT: " + str(output_pos_result))
+			if(output_pos_result != -1):
+				self.print_console("**OUTPUT RESULT: " + str(output_pos_result))
 	
 	def cancel_learning(self):
 		self.cancel_training = True
@@ -820,12 +841,13 @@ class user_interface:
 		if(neuron_radius > 15): neuron_radius = 15
 		neuron_x = neuron_radius + 20
 		neuron_dist_x = (self.canvas_width / (len(layers)-1)) - neuron_x*2
-		neuron_hidden_c = "blue"
-		neuron_outter_c = "red"
+		neuron_hidden_c = "#db7070"
+		neuron_outter_c = "#8bd78f"
+		line_color = "#a0a6b7"
 
 		bias_pos_diff_x = 50
 		bias_pos_diff_y = 50
-		bias_color = "green"
+		bias_color = "#837FD3"
 		bias_pos_y = neuron_radius*2
 
 		def get_layer_height_px(layer_count):
@@ -869,7 +891,7 @@ class user_interface:
 				self.tk_nn_visual_canvas.tag_raise(neuron_oval)
 
 				if(layer_has_bias == True):
-					bias_connector = self.tk_nn_visual_canvas.create_line(neuron_x, neuron_y, bias_x_pos,bias_y_pos)
+					bias_connector = self.tk_nn_visual_canvas.create_line(neuron_x, neuron_y, bias_x_pos,bias_y_pos,fill=line_color)
 					self.tk_nn_visual_canvas.tag_lower(bias_connector)
 
 				neuron_dist_y = (neuron_radius*2) + neuron_padding
@@ -880,7 +902,7 @@ class user_interface:
 					neuron_y_for_line = (self.canvas_height - (length_of_next_layer)*(neuron_radius*2 + neuron_padding))/2
 					
 					for neuron_weights in range(0,length_of_next_layer):
-						neuron_connector = self.tk_nn_visual_canvas.create_line(neuron_x, neuron_y, neuron_x+neuron_dist_x, neuron_y_for_line)
+						neuron_connector = self.tk_nn_visual_canvas.create_line(neuron_x, neuron_y, neuron_x+neuron_dist_x, neuron_y_for_line,fill=line_color)
 						self.tk_nn_visual_canvas.tag_lower(neuron_connector)
 
 						neuron_y_for_line += neuron_dist_y

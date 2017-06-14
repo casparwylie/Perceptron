@@ -297,7 +297,7 @@ class data_processor():
 
 	def prep_matrix_for_input(self, matrix):
 		matrix_float = matrix.astype(np.float32)
-		matrix_for_input = matrix_float / float(self.input_divider_val)
+		matrix_for_input = matrix_float / float(255)
 		return matrix_for_input
 
 	def get_avaliable_datasets(self, from_):

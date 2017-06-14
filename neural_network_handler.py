@@ -92,7 +92,6 @@ class neural_network:
 				bias_vals = (self.biases_for_non_input_layers[after_input_layer-1] * self.biases_weights[after_input_layer-1])
 				hidden_neuron_sums += bias_vals
 			self.nn_neurons[after_input_layer] = self.activate_threshold(hidden_neuron_sums, "sigmoid")
-
 	def populate_input_layer(self, data):
 		self.nn_neurons[0] = np.array(data)
 
@@ -104,8 +103,7 @@ class neural_network:
 	output_error_total = 0
 	
 	def back_propagate(self, target_val,repeat_count,t_type):
-
-		if(t_type=="B"):
+		if(t_type[0]=="B"):
 			target_vector = self.user_interface.data_processor.populate_target_vector(target_val[0],self.output_count)
 		else:
 			target_vector = target_val
@@ -116,6 +114,7 @@ class neural_network:
 		else:
 
 			success_condition = (round(self.nn_neurons[-1][0]) == target_vector)
+
 		if(self.test_counter >= len(self.matrix_data)-self.test_data_amount):
 			if(success_condition == True):
 				self.correct_count += 1
@@ -184,13 +183,13 @@ class neural_network:
 				e_note_str = " (ep. "+str(epoch)+")"
 
 				if(self.is_small_data == False):
-					self.user_interface.update_canvas_info_label("Latest Success",str(success_p)+"%"+e_note_str)
+					self.user_interface.update_canvas_info_label("Latest Success",str(round(success_p,2))+"%"+e_note_str)
 				success_list.append(success_p)
 				self.test_counter = 0
 				self.correct_count = 0
 				post_epoch_time = time.time() - pre_epoch_time
 				if(self.is_small_data == False):
-					self.user_interface.update_canvas_info_label("Epoch Duration",str(round(post_epoch_time,3))+"s "+e_note_str)
+					self.user_interface.update_canvas_info_label("Epoch Duration",str(round(post_epoch_time,2))+"s "+e_note_str)
 				epoch_times.append(post_epoch_time)
 
 			if(len(success_list)>0):
