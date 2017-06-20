@@ -2,8 +2,8 @@ from __future__ import print_function
 import cv2,re,numpy as np,random,math,time,thread,decimal,tkMessageBox,tkSimpleDialog,matplotlib,os,json
 from pprint import pprint
 import FileDialog
-from Tkinter import *
 matplotlib.use('TkAgg')
+from mtTkinter import *
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg, NavigationToolbar2TkAgg
 import matplotlib.pyplot as plt
 import matplotlib.animation as animation
@@ -43,12 +43,12 @@ class user_interface:
 		self.render_ui_widgets()
 
 	def quit_all(self):
-		self.tk_main.destroy();
-		sys.exit();
+		self.tk_main.destroy()
+		os._exit(0)
 
 	def render_ui_frames(self):
 
-		self.learn_options_frame = Frame(self.ui_frame,width=500,background=self.main_bg)
+		self.learn_options_frame = Frame(self.ui_frame,background=self.main_bg)
 		self.learn_options_frame.pack(fill=BOTH,side=LEFT)
 		#self.console_frame = Frame(self.ui_frame,bg="grey",height=300,width=400)
 		#self.console_frame.pack()
@@ -57,7 +57,7 @@ class user_interface:
 
 		self.lower_frame = Frame(self.ui_frame,background=self.main_bg)
 		self.lower_frame.pack(side=BOTTOM, fill=BOTH)
-		self.console_list_box = Text(self.lower_frame,height=16,width=34,borderwidth=0, highlightthickness=0,bg="#212737",fg="green",font=("courier",9))
+		self.console_list_box = Text(self.lower_frame,height=16,width=34,borderwidth=0, highlightthickness=0,bg="#212737",fg="white",font=("courier",9))
 		self.console_list_box.pack(ipady=20,ipadx=10,side=LEFT,fill=Y)
 		self.console_list_box.config(yscrollcommand=self.c_scrollbar.set)
 		self.console_list_box.configure(state="disabled")
@@ -88,7 +88,7 @@ class user_interface:
 		self.g_axis[line_num].get_yaxis().set_visible(False)
 		self.g_axis[line_num].get_xaxis().set_visible(False)
 		self.g_canvas[line_num] = FigureCanvasTkAgg(self.g_figures[line_num], master=self.lower_frame)
-		self.g_canvas[line_num].get_tk_widget().config(width=340,height=280)
+		self.g_canvas[line_num].get_tk_widget().config(width=310,height=280)
 		self.g_canvas[line_num].get_tk_widget().pack(side=LEFT,fill=X)
 
 
@@ -166,6 +166,7 @@ class user_interface:
 	default_output_count = "5"
 
 	def render_nn_vis_trigger(self,event=None):
+
 		if(event==None):
 			hidden_str = self.default_hidden_layers_str
 			bias_str = self.default_bias_str
@@ -202,11 +203,23 @@ class user_interface:
 				if(len(layers) > 0 and len(biases) > 0):
 					self.render_neural_net_visualization(layers,biases)
 
-	def render_dataset_opts(self):
+	def render_dataset_opts(self,exists=False):
 		avaliable_datasets = ["--select--"]
 		for file in self.data_processor.get_avaliable_datasets("new"):
 			avaliable_datasets.append(file)
-		self.input_fields["dataset_name"] = self.render_input_field(0,"Dataset File","Chose avaliable text file",5,self.learn_options_frame,drop=avaliable_datasets,command=self.update_expected_nn_io_fields)
+		if(exists==False):
+			self.input_fields["dataset_name"] = self.render_input_field(0,"Dataset File","Chose avaliable text file",5,self.learn_options_frame,drop=avaliable_datasets,command=self.update_expected_nn_io_fields)
+		else:
+			for field in self.all_drop_frames["Dataset File: "].winfo_children():
+				field.destroy()
+			self.input_fields["dataset_name"] = StringVar(self.tk_main)
+			self.input_fields["dataset_name"] 
+			opt = OptionMenu(self.all_drop_frames["Dataset File: "], self.input_fields["dataset_name"],command=self.update_expected_nn_io_fields,*avaliable_datasets)
+			self.style_drop_manual(opt)
+			opt.config(width=15)
+			opt.pack(padx=3)
+			self.input_fields["dataset_name"].set('--select--')
+
 
 	def render_ui_widgets(self):
 		self.render_nn_vis_trigger()
@@ -217,29 +230,28 @@ class user_interface:
 		self.icon_view.pack()
 	
 		self.choose_settings_frame = Frame(self.learn_options_frame)
-		self.choose_settings_frame.pack()
+		self.choose_settings_frame.pack(pady=(20,0))
 		self.render_settings_opts()
-		
 
-		self.all_drops = {}
 		self.input_fields = {}
 		self.input_labels = {}
 		self.input_descs = {}
 		self.widget_frames = {}
 		self.input_descs_vis = {}
+		self.all_drop_frames = {}
 
 		self.open_prepro_window = self.render_option("DATA PREPROCESSOR", self.preprocess_data_render, self.learn_options_frame,width=18)
 
 		self.render_dataset_opts()
 		self.input_fields["data_to_retrieve"]= self.render_input_field("all", "Data To Use","Enter 'all' or number of items to use from dataset",self.input_text_length,self.learn_options_frame)
-		self.input_fields["matrix_dims"] = self.render_input_field(self.default_input_dims,"Matrix Input Dimensions","Enter single value or enter height, width of matrix with comma",self.input_text_length,self.learn_options_frame,command=self.render_nn_vis_trigger)
+		self.input_fields["matrix_dims"] = self.render_input_field(self.default_input_dims,"Input Count","Enter single value or enter height, width of matrix with comma",self.input_text_length,self.learn_options_frame,command=self.render_nn_vis_trigger)
 		self.input_fields["output_count"] = self.render_input_field(self.default_output_count, "Output Count","Enter output quantity",self.input_text_length,self.learn_options_frame,command=self.render_nn_vis_trigger)
 		self.input_fields["hidden_layer"] = self.render_input_field(self.default_hidden_layers_str, "Hidden Layers", "Enter comma seperated list of hidden layer sizes",self.input_text_length, self.learn_options_frame,command=self.render_nn_vis_trigger)
 		self.input_fields["bias_vals"] = self.render_input_field(self.default_bias_str, "Bias Values", "List must match hidden layer count plus output, but enter 0 for no bias",self.input_text_length,self.learn_options_frame,command=self.render_nn_vis_trigger)
 		self.input_fields["learning_rate"] = self.render_input_field("0.5", "Learning Rate","Enter decimal or integer",self.input_text_length,self.learn_options_frame)
 		self.input_fields["weight_range"] = self.render_input_field("-1,1", "Weight Ranges","Enter one value (or two for a range) for initial weight values",self.input_text_length, self.learn_options_frame)
-		self.input_fields["epochs"] = self.render_input_field("100", "Dataset Iterations","Total number of iterations through all data loaded",self.input_text_length, self.learn_options_frame)
-		self.input_fields["test_data_partition"] = self.render_input_field("10", "Data for Testing","Amount of data to partition from dataset for result testing",self.input_text_length, self.learn_options_frame)
+		self.input_fields["epochs"] = self.render_input_field("100", "Epochs","Total number of iterations through all data loaded",self.input_text_length, self.learn_options_frame)
+		self.input_fields["test_data_partition"] = self.render_input_field("10", "Data for Testing (%)","Amount of data to partition from dataset for result testing (as a percentage)",self.input_text_length, self.learn_options_frame)
 		
 		self.mid_labels_frame = Frame(self.learn_options_frame,bg=self.main_bg)
 		self.mid_labels_frame.pack(expand=True,fill=BOTH)
@@ -274,15 +286,11 @@ class user_interface:
 			desc_frame.pack(fill=None,side=BOTTOM,expand=False)
 
 			if(drop!=None):
+				self.all_drop_frames[label_text] = Frame(self.widget_frames[label_text],bg=self.main_bg)
+				self.all_drop_frames[label_text].pack(side=RIGHT)
 				input_widget_val = StringVar(self.tk_main)
-				input_widget = OptionMenu(self.widget_frames[label_text], input_widget_val,command=command,*drop)
-				input_widget.config(bg=self.opt_bgcolor)
-				input_widget.config(relief=FLAT)
-				input_widget["menu"].config(bg=self.opt_bgcolor)
-				input_widget.config(highlightthickness=0)
-				input_widget["menu"].config(bg=self.opt_bgcolor)
-				input_widget.config(foreground="white")
-				self.all_drops[label_text] = input_widget
+				input_widget = OptionMenu(self.all_drop_frames[label_text], input_widget_val,command=command,*drop)
+				self.style_drop_manual(input_widget)
 				input_widget.config(width=15)
 				input_widget_val.set(drop[default_value])
 			else:
@@ -315,14 +323,14 @@ class user_interface:
 		if(self.input_fields["dataset_name"].get() != "--select--"):
 			dataset = open(self.data_processor.folders_for_data["new"]+"/"+self.input_fields["dataset_name"].get(), 'r').read().split("\n")
 			self.dataset_row_count = len(dataset)-1
-			t_type = dataset[0]
-			sample_dataset_row = dataset[1].split(",")
+			dataset_meta = json.loads(dataset[0])
+			sample_dataset_row = dataset[3].split(",")
 			self.expected_input_count = len(sample_dataset_row)-1
 			self.expected_hidden_count = int(round(math.sqrt(int(round(self.expected_input_count))))+10)
-			if(t_type[1]!="B"):
+			if(dataset_meta["target_info"][0]!="Binary"):
 				self.expected_output_count = len(sample_dataset_row[-1].split("/"))
 			else:
-				self.expected_output_count = int(t_type[7:])
+				self.expected_output_count = int(dataset_meta["target_info"][1])
 			self.input_fields["output_count"].delete(0,END)
 			self.input_fields["output_count"].insert(0,self.expected_output_count)
 			self.input_fields["matrix_dims"].delete(0,END)
@@ -373,6 +381,15 @@ class user_interface:
 				self.input_fields[input_field].insert(0,spec_settings[input_field])
 			self.render_nn_vis_trigger(True)
 
+
+	def style_drop_manual(self,drop):
+		drop.config(bg=self.opt_bgcolor)
+		drop["menu"].config(bg=self.opt_bgcolor)
+		drop.config(foreground="white")
+		drop.config(highlightthickness=0)
+		drop["menu"].config(foreground="white")
+		drop.config(relief=FLAT)
+
 	def render_settings_opts(self):
 		self.saved_settings_dis_text = "--Saved Settings--"
 		settings_str = open(self.settings_file_name, "r").read()
@@ -384,12 +401,7 @@ class user_interface:
 		self.saved_settings_text = StringVar(self.tk_main)
 		self.saved_settings_opts = OptionMenu(self.choose_settings_frame, self.saved_settings_text,command=self.load_settings,*saved_settings)
 		self.saved_settings_opts.config(width=16)
-		self.saved_settings_opts.config(bg=self.opt_bgcolor)
-		self.saved_settings_opts["menu"].config(bg=self.opt_bgcolor)
-		self.saved_settings_opts.config(foreground="white")
-		self.saved_settings_opts.config(highlightthickness=0)
-		self.saved_settings_opts["menu"].config(foreground="white")
-		self.saved_settings_opts.config(relief=FLAT)
+		self.style_drop_manual(self.saved_settings_opts)
 		self.saved_settings_opts.pack()
 		self.saved_settings_text.set(saved_settings[0])
 
@@ -514,9 +526,9 @@ class user_interface:
 		avaliable_datasets = ["--select--"]
 		for file in self.data_processor.get_avaliable_datasets("old"):
 			avaliable_datasets.append(file)
-		self.prepro["original_file"]= self.render_input_field(0,"Dataset File","Chose avaliable text file",5,self.preprocess_form,drop=avaliable_datasets, command=self.update_prepro_viewer_for_struct)
+		self.prepro["original_file"]= self.render_input_field(0,"File To Process","Chose avaliable text file",5,self.preprocess_form,drop=avaliable_datasets, command=self.update_prepro_viewer_for_struct)
 
-		self.prepro["row_separator_char"] = self.render_input_field("\n", "Row Separator Char","Enter the character that separates each row, default is a '\\n' ",self.input_text_length, self.preprocess_form,command=self.update_prepro_viewer_for_struct)
+		self.prepro["row_separator_char"] = self.render_input_field("\n", "Row Delimiter","Enter the character that separates each row, default is a '\\n' ",self.input_text_length, self.preprocess_form,command=self.update_prepro_viewer_for_struct)
 		ig_first_row_opts = ["No", "Yes"]
 		self.prepro["ignore_first_row"] = self.render_input_field(0,"Ignore First Row","If first row are labels/column names, remove them.",5,self.preprocess_form,drop=ig_first_row_opts,command=self.update_prepro_viewer_for_struct)
 		self.prepro["fields_to_ignore"] = self.render_input_field("", "Fields to Ignore","Enter position of fields to be removed/ignored (where first field is 0) ",self.input_text_length,self.preprocess_form,command=self.update_prepro_viewer_for_struct)
@@ -536,6 +548,9 @@ class user_interface:
 		self.prepro_vb_frame = Frame(self.preprocess_form,bg=self.main_bg)
 		self.prepro_vb_frame.pack(fill=BOTH)
 		self.prepro["bin_range"] = None
+
+		self.prepro["rows_for_testing"] = self.render_input_field("", "Disclude Rows For Testing","Enter list or range of rows that should be unseen by the neural net, for testing later.",self.input_text_length,self.preprocess_form)
+		
 
 		self.prepro_opt = self.render_option("PROCESS", self.start_preprocess, self.preprocess_form)
 		self.reset_opt = self.render_option("RESET", self.reset_prepro, self.preprocess_form)
@@ -638,48 +653,61 @@ class user_interface:
 		else:
 			tkMessageBox.showinfo("Error", poss_errors)
 
-	def refresh_data_drop(self):
-		self.all_drops["Dataset File: "].destroy()
-		self.render_dataset_opts()
-
 	def test_input(self):
-		input_str = tkSimpleDialog.askstring("Enter Input", "Enter the name of an image file, text file, enter row data manually: ")
+		input_str = tkSimpleDialog.askstring("Enter Input", "Enter the name of an image file, text file, 'MNIST' for the demo, or enter row data manually: ")
 		if(input_str):
 			file_type_pos = input_str.rfind(".")
 			valid_files = ["png","jpg","txt"]
 			file_type_str = ""
-			'''if(input_str == "camera"):
+			if(input_str == "MNIST"):
 				self.render_camera()
-			else:'''
-			if(file_type_pos != -1):
-				file_type_str = input_str[file_type_pos+1:]
-			
-			if(file_type_str not in valid_files or file_type_str == "txt"):
-				if(file_type_str == "txt"):
-					input_str = open(input_str, 'r').read()
-				input_data = input_str.split(",")
-				matrix_ready = self.data_processor.prep_matrix_for_input(np.asarray(input_data))
+			else:
+				if(file_type_pos != -1):
+					file_type_str = input_str[file_type_pos+1:]
 				
-			elif(file_type_str in valid_files):
-				image_matrix = cv2.imread(file_name)
-				image_matrix = cv2.cvtColor(image_matrix, cv2.COLOR_BGR2GRAY)
-				image_matrix = cv2.resize(image_matrix, (self.matrix_dims[0],self.matrix_dims[1]))
-				matrix_ready = self.matrix_data_loader.prep_matrix_for_input(image_matrix)
-			else:
-				output_pos_result = -1
-				self.print_console("**ERROR: invalid test input")
+				if(file_type_str not in valid_files or file_type_str == "txt"):
+					if(file_type_str == "txt"):
+						input_str = open(input_str, 'r').read()
+					input_data = input_str.split(",")
+					new_data = []
+					for target_d in self.dataset_meta["target_info"][2]:
+						input_data.insert(int(target_d),None)
+					processed_row,t,s = self.data_processor.change_data_to_processed(self.dataset_meta,input_data)
+					el_i = 0
+					for el in processed_row:
+						if(el == None):
+							del processed_row[el_i]
+						el_i += 1
+					matrix_ready = np.asarray(processed_row, dtype=np.float32)
+				elif(file_type_str in valid_files):
+					image_matrix = cv2.imread(file_name)
+					image_matrix = cv2.cvtColor(image_matrix, cv2.COLOR_BGR2GRAY)
+					image_matrix = cv2.resize(image_matrix, (self.matrix_dims[0],self.matrix_dims[1]))
+					matrix_ready = self.matrix_data_loader.prep_matrix_for_input(image_matrix)
+				else:
+					output_pos_result = -1
+					self.print_console("**ERROR: invalid test input")
 
-			self.neural_network.feed_forward(matrix_ready)
-			output_neurons = self.neural_network.nn_neurons[-1].tolist()
-			if(len(output_neurons)>1):
-				print(output_neurons)
-				output_pos_result = output_neurons.index(max(output_neurons))
-			else:
-				output_pos_result = output_neurons[0]
+				self.neural_network.feed_forward(matrix_ready)
+				
+				output_neurons = self.neural_network.nn_neurons[-1].tolist()
+				if(len(output_neurons)>1):
+					if(self.dataset_meta["target_info"][0]=="Binary"):
+						
+						output_pos_result = output_neurons.index(max(output_neurons))
+						for trans_field in self.dataset_meta["translations"]:
+							if(int(trans_field) in self.dataset_meta["target_info"][2]):
+								for trans in range(0,len(self.dataset_meta["translations"][trans_field][1])):
+									if(output_pos_result == self.dataset_meta["translations"][trans_field][1][trans]):
+										output_pos_result = self.dataset_meta["translations"][trans_field][0][trans]
 
 
-			if(output_pos_result != -1):
-				self.print_console("**OUTPUT RESULT: " + str(output_pos_result))
+				else:
+					output_pos_result = output_neurons[0]
+
+
+				if(output_pos_result != -1):
+					self.print_console("**OUTPUT RESULT: " + str(output_pos_result))
 	
 	def cancel_learning(self):
 		self.cancel_training = True
@@ -805,14 +833,14 @@ class user_interface:
 			self.input_neuron_count = field_result['matrix_dims']
 			self.matrix_data = self.data_processor.matrices
 			self.matrix_targets = self.data_processor.targets
-			self.t_type = self.data_processor.t_type
+			self.dataset_meta = self.data_processor.dataset_meta
 		
 		self.neural_network = neural_network()
 		self.neural_network.initilize_nn(field_result['hidden_layers'],
 				self.input_neuron_count,field_result['output_count'], self.matrix_data,self.matrix_targets,
 				field_result['biases_for_non_input_layers'], field_result['learning_constant'], 
 				testing_mode,field_result['weight_range'],field_result['epochs'],field_result['data_to_test'],
-				self.t_type,self.dataset_row_count,self)
+				self.dataset_meta,self.dataset_row_count,self)
 		self.prev_to_retrieve_val = field_result['to_retrieve']
 		self.neural_network.train()
 

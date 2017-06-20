@@ -7,7 +7,7 @@ class neural_network:
 	def initilize_nn(self, hidden_layers,
 					input_count, output_count, matrix_data,matrix_targets,
 					biases_for_non_input_layers, learning_constant,
-					testing_mode,weight_range,epochs,data_to_test,t_type,data_total,user_interface):
+					testing_mode,weight_range,epochs,data_to_test,dataset_meta,data_total,user_interface):
 
 		self.user_interface = user_interface
 		if(self.user_interface.cancel_training == False):
@@ -20,7 +20,7 @@ class neural_network:
 			self.epochs = epochs
 			divider_to_test = float(data_to_test)/100.0
 			self.test_data_amount = int(round(divider_to_test*data_total))
-			self.t_type = t_type
+			self.dataset_meta = dataset_meta
 			self.matrix_data = matrix_data
 			self.hidden_layers = hidden_layers
 			self.matrix_targets = matrix_targets
@@ -31,7 +31,7 @@ class neural_network:
 			self.biases_for_non_input_layers = biases_for_non_input_layers
 			self.weight_range = weight_range 
 			self.success_records = []
-			if(len(self.matrix_targets)<100):
+			if(len(self.matrix_targets)<=1000):
 				self.is_small_data = True
 			else:
 				self.is_small_data = False
@@ -102,8 +102,8 @@ class neural_network:
 	error_by_1000_counter = 1
 	output_error_total = 0
 	
-	def back_propagate(self, target_val,repeat_count,t_type):
-		if(t_type[0]=="B"):
+	def back_propagate(self, target_val,repeat_count):
+		if(self.dataset_meta["target_info"][0]=="Binary"):
 			target_vector = self.user_interface.data_processor.populate_target_vector(target_val[0],self.output_count)
 		else:
 			target_vector = target_val
@@ -120,10 +120,12 @@ class neural_network:
 				self.correct_count += 1
 		if(success_condition == False):
 				self.error_by_1000 += 1
+
 		if(self.error_by_1000_counter % 1000 == 0):
 			self.user_interface.animate_graph_figures(0,self.error_by_1000/10)
 			self.error_by_1000 = 0
 			self.error_by_1000_counter = 0
+
 		for weight_layer_count in range(len(self.all_weights)-1,-1,-1):
 			weight_neuron_vals = np.expand_dims(self.nn_neurons[weight_layer_count+1],axis=1)
 			target_vector = np.expand_dims(target_vector,axis=1)
@@ -173,7 +175,7 @@ class neural_network:
 						break
 					target_vals = self.matrix_targets[matrix_count]
 					self.feed_forward(matrix)
-					self.back_propagate(target_vals,epoch,self.t_type)
+					self.back_propagate(target_vals,epoch)
 					matrix_count += 1
 				if(self.user_interface.cancel_training == True):
 					break
@@ -181,10 +183,11 @@ class neural_network:
 				success_p = (float(self.correct_count)/float(self.test_data_amount))*100
 				self.user_interface.animate_graph_figures(1,success_p)
 				e_note_str = " (ep. "+str(epoch)+")"
+				success_list.append(success_p)
 
 				if(self.is_small_data == False):
 					self.user_interface.update_canvas_info_label("Latest Success",str(round(success_p,2))+"%"+e_note_str)
-				success_list.append(success_p)
+				
 				self.test_counter = 0
 				self.correct_count = 0
 				post_epoch_time = time.time() - pre_epoch_time
@@ -208,7 +211,7 @@ class neural_network:
 			self.user_interface.print_console(training_done_msg)
 			self.user_interface.print_console("AVERAGE SUCCESS: " + str(av_success) + "%")
 			self.user_interface.print_console("HIGHEST SUCCESS: " + str(highest_success) + "%")
-			self.user_interface.print_console("TOTAL TIME: " + str(sum(epoch_times,5)) + "s")
+			self.user_interface.print_console("TOTAL TIME: " + str(sum(epoch_times)) + "s")
 			self.user_interface.print_console("AVERAGE EPOCH TIME: " + str(round(av_epoch_time,5)) + "s")
 
 	def activate_threshold(self,value, type):
