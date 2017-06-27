@@ -45,6 +45,7 @@ class user_interface:
 	def quit_all(self):
 		self.tk_main.destroy()
 		os._exit(0)
+		sys.exit()
 
 	def render_ui_frames(self):
 
@@ -159,11 +160,11 @@ class user_interface:
 
 
 	input_text_length = 8
-	default_hidden_layers_str = "10,20"
-	default_bias_str = "1,1,0"
-	default_input_dims = "20"
+	default_hidden_layers_str = "6,9"
+	default_bias_str = "1,1,1"
+	default_input_dims = "8"
 	default_data_set_str = ".txt"
-	default_output_count = "5"
+	default_output_count = "2"
 
 	def render_nn_vis_trigger(self,event=None):
 
@@ -239,6 +240,7 @@ class user_interface:
 		self.widget_frames = {}
 		self.input_descs_vis = {}
 		self.all_drop_frames = {}
+		self.all_drops = {}
 
 		self.open_prepro_window = self.render_option("DATA PREPROCESSOR", self.preprocess_data_render, self.learn_options_frame,width=18)
 
@@ -289,7 +291,8 @@ class user_interface:
 				self.all_drop_frames[label_text] = Frame(self.widget_frames[label_text],bg=self.main_bg)
 				self.all_drop_frames[label_text].pack(side=RIGHT)
 				input_widget_val = StringVar(self.tk_main)
-				input_widget = OptionMenu(self.all_drop_frames[label_text], input_widget_val,command=command,*drop)
+				self.all_drops[label_text] = OptionMenu(self.all_drop_frames[label_text], input_widget_val,command=command,*drop)
+				input_widget = self.all_drops[label_text]
 				self.style_drop_manual(input_widget)
 				input_widget.config(width=15)
 				input_widget_val.set(drop[default_value])
@@ -324,11 +327,28 @@ class user_interface:
 			dataset = open(self.data_processor.folders_for_data["new"]+"/"+self.input_fields["dataset_name"].get(), 'r').read().split("\n")
 			self.dataset_row_count = len(dataset)-1
 			dataset_meta = json.loads(dataset[0])
+			print(dataset_meta["alphas"])
+			dataset_meta["alphas"] = self.data_processor.sort_dataset_meta_alphas(dataset_meta["alphas"])
+			print(dataset_meta["alphas"])
 			sample_dataset_row = dataset[3].split(",")
-			self.expected_input_count = len(sample_dataset_row)-1
+			self.expected_input_count = 0
+			for item_i in dataset_meta["alphas"]:
+				if(int(item_i) not in dataset_meta["target_info"][2]):
+					if(dataset_meta["alphas"][item_i] == None):
+						item_class_len = 0
+					else:
+						item_class_len = len(dataset_meta["alphas"][item_i])
+						if(item_class_len == 0): item_class_len = 1
+					self.expected_input_count += item_class_len
+
+
 			self.expected_hidden_count = int(round(math.sqrt(int(round(self.expected_input_count))))+10)
 			if(dataset_meta["target_info"][0]!="Binary"):
-				self.expected_output_count = len(sample_dataset_row[-1].split("/"))
+				self.expected_output_count = 0
+				for t_pos in dataset_meta["target_info"][2]:
+					t_alpha_pos_len = len(dataset_meta["alphas"][t_pos])
+					if(t_alpha_pos_len == 0): t_alpha_pos_len = 1
+					self.expected_output_count += t_alpha_pos_len
 			else:
 				self.expected_output_count = int(dataset_meta["target_info"][1])
 			self.input_fields["output_count"].delete(0,END)
@@ -537,11 +557,10 @@ class user_interface:
 		self.prepro_mins_frame = Frame( self.preprocess_form,bg=self.main_bg)
 		self.prepro_mins_frame.pack(fill=BOTH)
 
-		self.prepro["found_alphas_trans"] = {}
-		self.alpha_trans_opt = self.render_option("Translate Alphas", self.render_trans_alpha_window, self.preprocess_form,width=20)
+		self.alpha_trans_opt = self.render_option("See Alpha Classes", self.render_trans_alpha_window, self.preprocess_form,width=20)
 		#self.alpha_trans_opt.configure(state="disabled")
 
-		target_types = ["--select--","Binary", "Real"]
+		target_types = ["--select--","Binary", "Real", "Alpha Encoded"]
 		self.prepro["target_val_pos"] = self.render_input_field("", "Target position(s)","Enter position of fields that are target values",self.input_text_length,self.preprocess_form,command=self.update_prepro_viewer_for_struct)
 		self.prepro["target_type"] = self.render_input_field(0,"Target Value Type","Choose binary or numeric",5,self.preprocess_form,drop=target_types, command=self.prepro_vb_change)
 		
@@ -551,7 +570,6 @@ class user_interface:
 
 		self.prepro["rows_for_testing"] = self.render_input_field("", "Disclude Rows For Testing","Enter list or range of rows that should be unseen by the neural net, for testing later.",self.input_text_length,self.preprocess_form)
 		
-
 		self.prepro_opt = self.render_option("PROCESS", self.start_preprocess, self.preprocess_form)
 		self.reset_opt = self.render_option("RESET", self.reset_prepro, self.preprocess_form)
 
@@ -559,61 +577,52 @@ class user_interface:
 		self.preprocess_window.destroy()
 		self.preprocess_data_render()
 
+	is_viewing_trans = False
 	def render_trans_alpha_window(self,event=None):
+		self.is_viewing_trans = True
 		self.prepro_transAN_frame = Toplevel( self.ui_frame,width=200,height=200,bg=self.main_bg)
 		self.prepro_transAN_frame.protocol('WM_DELETE_WINDOW', self.unset_alpha_fields)
 		has_found_alphas = False
-		for field in self.data_processor.found_alphas:
-			if(len(self.data_processor.found_alphas[field])>0):
-				has_found_alphas = True
-				alphas_found_as_str =  ','.join(str(e) for e in self.data_processor.found_alphas[field])
-				label_txt = "field_"+str(field)+" alphas found: " + alphas_found_as_str
-				new_trans_field = self.render_input_field("", label_txt, "Enter values",self.input_text_length,self.prepro_transAN_frame,command=self.update_prepro_viewer_for_struct)
-				default_trans_str = ','.join(str(i) for i in range(0,len(self.data_processor.found_alphas[field])))
-				new_trans_field.insert(0,default_trans_str)
-				self.prepro["found_alphas_trans"][field]=new_trans_field
-		if(has_found_alphas == True):
-			self.update_prepro_viewer_for_struct()
-			self.render_option("Revert To Alphas", self.revert_fields_to_alpha,self.prepro_transAN_frame,width=20)
-		else:
-			Label(self.prepro_transAN_frame, text="No alphas found",font=(self.font_face, self.main_font_size)).pack()
-
-	def revert_fields_to_alpha(self):
-		for field in self.prepro["found_alphas_trans"]:
-			self.prepro["found_alphas_trans"][field].delete(0,END)
-			self.prepro["found_alphas_trans"][field].insert(0,"")
 		self.update_prepro_viewer_for_struct()
+		Label(self.prepro_transAN_frame, text="Alpha Classes Found...",font=(self.font_face, self.main_font_size+2),bg=self.main_bg).pack()
+		if(len(self.data_processor.found_alphas) > 0):
+			for field in self.data_processor.found_alphas:
+				if(len(self.data_processor.found_alphas[field])>0):
+					has_found_alphas = True
+					alphas_found_as_str =  ','.join(str(e) for e in self.data_processor.found_alphas[field])
+					label_txt = "field_"+str(field)+": " + alphas_found_as_str
+					Label(self.prepro_transAN_frame, text=label_txt,font=(self.font_face, self.main_font_size),bg=self.main_bg).pack()
+		else:
+			Label(self.prepro_transAN_frame, text="No alphas found",font=(self.font_face, self.main_font_size),bg=self.main_bg).pack()
+
+
 
 	def unset_alpha_fields(self):
 		self.prepro_transAN_frame.destroy()
-		self.prepro["found_alphas_trans"] = {}
+		self.is_viewing_trans = False
+		self.update_prepro_viewer_for_struct()
 
 	def update_prepro_viewer_for_struct(self,event=None):
 		if(os.path.isfile(self.data_processor.folders_for_data["old"]+"/"+self.prepro["original_file"].get())):
 			if(self.prepro["row_separator_char"].get() == "\\n"):
 				self.prepro["row_separator_char"].delete(0,END)
 				self.prepro["row_separator_char"].insert(0,"\n")
+
 			prepro_vals = self.data_processor.validate_prepro()
 			struct_str = self.data_processor.struct_dataset(True, True,prepro_vals)
 			self.update_viewer_text(struct_str)
+
+			if(self.data_processor.target_has_encoded_alphas):
+				self.prepro["target_type"].set("Alpha Encoded")
+				self.all_drops["Target Value Type: "].configure(state="disabled")
+			else:
+				self.all_drops["Target Value Type: "].configure(state="normal")
 
 	def update_viewer_text(self, text):
 		self.inter_viewer_box.configure(state="normal")
 		self.inter_viewer_box.delete(1.0,END)
 		self.inter_viewer_box.insert(INSERT, text)
 		self.inter_viewer_box.configure(state="disabled")
-
-	def add_AtN_field(self,event=None):
-		AtN_field_val = self.prepro["alpha_to_num_fields"].get()
-		if(self.check_str_list_valid(AtN_field_val)):
-			self.AtN_tran_fields = []
-			AtN_fields = self.map_to_int_if_valid(AtN_field_val)
-			if(AtN_fields!=False):
-				self.clear_frame(self.prepro_transAN_frame)
-				for field in AtN_fields:
-					new_field_alpha = self.render_input_field("", "String in field_"+str(field),"Enter the string/char/word/phrase(s) that needs translation as a list",self.input_text_length,self.prepro_transAN_frame,command=self.update_prepro_viewer_for_struct)
-					new_field_num = self.render_input_field("", "Number for field_"+str(field),"Enter your desired replacement numeric value(s) as a list that links with the string field",self.input_text_length,self.prepro_transAN_frame,command=self.update_prepro_viewer_for_struct)
-					self.AtN_tran_fields.append([new_field_alpha,new_field_num])
 
 	def add_min_field(self,event=None):
 		min_val = self.prepro["fields_to_min"].get()
@@ -678,7 +687,7 @@ class user_interface:
 						if(el == None):
 							del processed_row[el_i]
 						el_i += 1
-					matrix_ready = np.asarray(processed_row, dtype=np.float32)
+					matrix_ready = np.array(processed_row)
 				elif(file_type_str in valid_files):
 					image_matrix = cv2.imread(file_name)
 					image_matrix = cv2.cvtColor(image_matrix, cv2.COLOR_BGR2GRAY)
@@ -691,19 +700,21 @@ class user_interface:
 				self.neural_network.feed_forward(matrix_ready)
 				
 				output_neurons = self.neural_network.nn_neurons[-1].tolist()
+				print(output_neurons)
+				output_pos_result = output_neurons.index(max(output_neurons))
 				if(len(output_neurons)>1):
-					if(self.dataset_meta["target_info"][0]=="Binary"):
-						
-						output_pos_result = output_neurons.index(max(output_neurons))
-						for trans_field in self.dataset_meta["translations"]:
-							if(int(trans_field) in self.dataset_meta["target_info"][2]):
-								for trans in range(0,len(self.dataset_meta["translations"][trans_field][1])):
-									if(output_pos_result == self.dataset_meta["translations"][trans_field][1][trans]):
-										output_pos_result = self.dataset_meta["translations"][trans_field][0][trans]
-
+					if(self.dataset_meta["target_info"][0]=="Alpha Encoded"):
+						c = 0
+						for targ_pos in self.dataset_meta["target_info"][2]:
+							alphas = self.dataset_meta["alphas"][targ_pos]
+							print(alphas)
+							output_pos_result = alphas[output_pos_result]
+							c += 1
+					elif(self.dataset_meta["target_info"][0]=="Binary"):
+						output_pos_result = output_neurons
 
 				else:
-					output_pos_result = output_neurons[0]
+					output_pos_result = output_neurons
 
 
 				if(output_pos_result != -1):

@@ -46,7 +46,7 @@ class neural_network:
 		for i in self.hidden_layers:
 			hidden_layer = np.zeros(i)
 			self.nn_neurons.append(hidden_layer)
-		self.nn_neurons.append(nn_outputs)
+		self.nn_neurons.append(nn_outputs) 
 
 	def populate_all_weights(self):
 		for neuron_layer in range(1, len(self.nn_neurons)):
@@ -92,8 +92,18 @@ class neural_network:
 				bias_vals = (self.biases_for_non_input_layers[after_input_layer-1] * self.biases_weights[after_input_layer-1])
 				hidden_neuron_sums += bias_vals
 			self.nn_neurons[after_input_layer] = self.activate_threshold(hidden_neuron_sums, "sigmoid")
+	
+
 	def populate_input_layer(self, data):
-		self.nn_neurons[0] = np.array(data)
+		encoded_input = []
+		item_i = 0
+		for item_pos in self.dataset_meta["alphas"]:
+			if(int(item_pos) not in self.dataset_meta["target_info"][2]):
+				bin_vec = self.user_interface.data_processor.alpha_class_to_binary_vector(data[item_i], self.dataset_meta["alphas"][item_pos])
+				encoded_input += bin_vec
+				item_i += 1
+		self.nn_neurons[0] = np.array(encoded_input, dtype=np.float32)
+
 
 	testing_output_mode = False
 	test_counter = 0
@@ -102,15 +112,27 @@ class neural_network:
 	error_by_1000_counter = 1
 	output_error_total = 0
 	
-	def back_propagate(self, target_val,repeat_count):
-		if(self.dataset_meta["target_info"][0]=="Binary"):
-			target_vector = self.user_interface.data_processor.populate_target_vector(target_val[0],self.output_count)
+	def construct_target_for_bp(self,target_val):
+		if(self.dataset_meta["target_info"][0]=="Binary" and str(target_val[0]).isdigit()):
+			target_vector = self.user_interface.data_processor.populate_binary_vector(target_val[0],self.output_count)
 		else:
-			target_vector = target_val
+			target_vector = []
+			t_i = 0
+			for t_val in target_val:
+				t_pos = self.dataset_meta["target_info"][2][t_i]
+				bin_vec = self.user_interface.data_processor.alpha_class_to_binary_vector(t_val,self.dataset_meta["alphas"][t_pos])
+				target_vector += bin_vec
+				t_i += 1
+		return target_vector
+
+	def back_propagate(self, target_val,repeat_count):
+		
+		target_vector = self.construct_target_for_bp(target_val)
 
 		if(len(self.nn_neurons[-1])>1):
 			outputs_as_list = self.nn_neurons[-1].tolist()
-			success_condition = (outputs_as_list.index(max(outputs_as_list))==int(target_val[0]))
+
+			success_condition = (outputs_as_list.index(max(outputs_as_list))==target_vector.index(max(target_vector)))
 		else:
 
 			success_condition = (round(self.nn_neurons[-1][0]) == target_vector)

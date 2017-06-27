@@ -11,11 +11,9 @@ class data_processor():
 
 	found_alphas = {}
 	prev_file =  ""
-	prev_translations = None
 	row_len = -1
+	target_has_encoded_alphas = False
 	def struct_dataset(self, for_viewer, return_str,prepro_vals):
-		if(self.prev_translations != None and len(prepro_vals["translations"])==0):
-			prepro_vals["translations"] = self.prev_translations
 		new_dataset_str = ""
 		new_dataset = []
 		if(len(prepro_vals["row_separator_char"]) > 0 and os.path.isfile(self.folders_for_data["old"]+"/"+prepro_vals["original_file"])):
@@ -23,7 +21,7 @@ class data_processor():
 			dataset_meta = {}
 			dataset_meta["target_info"] = [prepro_vals["target_type"],prepro_vals["bin_range"],prepro_vals["target_val_pos"]]
 			dataset_meta["minimisations"] = prepro_vals["minimisations"]
-			dataset_meta["translations"] = prepro_vals["translations"]
+			dataset_meta["alphas"] = self.found_alphas
 			dataset_meta["fields_to_ignore"] = prepro_vals["fields_to_ignore"]
 			if(for_viewer == False):
 				name_for_new = prepro_vals["original_file"][0:prepro_vals["original_file"].rfind(".")]
@@ -41,6 +39,13 @@ class data_processor():
 				else:
 					end = len(data_by_row)
 				start = 0
+
+				if(len(self.found_alphas)>0):
+					print(self.found_alphas)
+					for ig in prepro_vals["fields_to_ignore"]:
+						if(ig in self.found_alphas.keys()):
+							del self.found_alphas[ig]
+
 				if(prepro_vals["ignore_first_row"]): start += 1
 				#prepro_vals["fields_to_ignore"].append(prepro_vals["target_val_pos"])
 				for row_i in range(start,end):
@@ -49,46 +54,44 @@ class data_processor():
 						if row_i == start: self.row_len = len(row)
 						row = self.strip_row_list(row)
 						new_row,new_target_list,sing_bin_target = self.change_data_to_processed(dataset_meta,row,prepro_vals["target_val_pos"])
-						'''new_row = []
-						sing_bin_target = None
-						is_valid_bin_target = (prepro_vals['bin_range'] != None and len(prepro_vals["target_val_pos"])==1)
-						if(len(row)>1):
-							
-							for el_i in range(0,len(row)):
-								new_el = row[el_i]
-								if(el_i not in prepro_vals["fields_to_ignore"]):
-									new_el=self.real_strip(new_el)
-									if(new_el == str(new_el)):
-										if(prepro_vals["minimisations"]["except"] != False and str(new_el).replace(".","").isdigit()):
-											if (prepro_vals["minimisations"]["all"] != None) and (el_i not in prepro_vals["minimisations"]["except"]):
-												new_el = str(float(new_el)/prepro_vals["minimisations"]["all"])
-											if(prepro_vals["minimisations"]["all"] == None):
-												if(el_i in prepro_vals["fields_to_min"]):
-													new_el = str(float(new_el)/prepro_vals["minimisations"][el_i])
-										if(el_i in prepro_vals["translations"]):
-											if(new_el in prepro_vals["translations"][el_i][0]):
-												trans_from = prepro_vals["translations"][el_i][0]
-												trans_to = prepro_vals["translations"][el_i][1]
-												if(len(trans_from) >0):
-													for from_i in range(0,len(trans_from)):
-														if(trans_from[from_i] == new_el):
-															if(from_i < len(trans_to)):
-																new_el = trans_to[from_i]
-
-									if(el_i in prepro_vals["target_val_pos"]):
-										if(is_valid_bin_target):
-											sing_bin_target = new_el
-										new_target_list+="/"+str(new_el)
-									else:
-										new_row.append(new_el)'''
-
 
 						new_target_list = new_target_list[1:]
+						encoded_row_str = ""
 						if(for_viewer == False):
 							new_row.append(new_target_list)
+						elif self.user_interface.is_viewing_trans:
+							encoded_row = []
+							temp_new_row = new_row
+							for to_ig in prepro_vals["fields_to_ignore"]:
+								temp_new_row.insert(to_ig,None)
+							for el_i in range(0,len(temp_new_row)):
+								if(temp_new_row[el_i] != None):
+		
+									vec = self.alpha_class_to_binary_vector(temp_new_row[el_i],self.found_alphas[el_i])
+									if(len(vec)>0): encoded_row.append(vec)
+
+							encoded_row_str = ','.join(str(e) for e in encoded_row)
 			
-						row_str = ','.join(str(e) for e in new_row)
-						new_target_list_for_dis = "["+new_target_list.replace("/",",")+"]"
+						if(len(encoded_row_str)>0):
+							row_str = encoded_row_str
+						else:
+							row_str = ','.join(str(e) for e in new_row)
+
+						if(new_target_list != "" and new_target_list.replace("/","").replace(".","").isdigit() == False):
+							self.target_has_encoded_alphas = True
+						else:
+							self.target_has_encoded_alphas = False
+
+						if(self.user_interface.is_viewing_trans):
+							encoded_targets = []
+							for targ_pos in prepro_vals["target_val_pos"]:
+								vec = self.alpha_class_to_binary_vector(row[targ_pos],self.found_alphas[targ_pos])
+								if(len(vec)>0):
+									encoded_targets.append(vec)
+
+							new_target_list_for_dis = "[" +(','.join(str(e) for e in encoded_targets))+ "]"	
+						else:
+							new_target_list_for_dis = "["+new_target_list.replace("/",",")+"]"
 						
 						if(new_target_list_for_dis != "[]"):
 							new_target_list_for_dis = "with target(s): "+new_target_list_for_dis
@@ -96,7 +99,7 @@ class data_processor():
 							new_target_list_for_dis = ""
 						if(for_viewer and sing_bin_target != None and str(sing_bin_target).isdigit()):
 							range_ = prepro_vals['bin_range']
-							target_vec_example = self.populate_target_vector(sing_bin_target,range_)
+							target_vec_example = self.populate_binary_vector(int(sing_bin_target),int(range_))
 							target_vec_ex_str = ','.join(str(e) for e in target_vec_example)
 							target_vec_ex_str = "   (as binary vector: [" + target_vec_ex_str + "] )"
 							new_target_list_for_dis += target_vec_ex_str
@@ -124,28 +127,12 @@ class data_processor():
 							del testing_row[targs]
 						new_testing_file.write((','.join(str(e) for e in testing_row))+"\n"+"...With correct targets: "+(','.join(str(e) for e in targs_show))+"\n\n")	
 
-				has_found_alpha = False
+
 				if(for_viewer and (len(self.found_alphas)==0 or prepro_vals["original_file"] != self.prev_file)):
-					for row_i in range(1,len(data_by_row)):
-						row = data_by_row[row_i].split(",")
-						row = self.strip_row_list(row)
-						for el_i in range(0,len(row)):
-							if(row_i == 1):
-								self.found_alphas[el_i] = []
-							elif row_i == 2 and has_found_alpha == False:
-								break
-
-							element = self.real_strip(row[el_i])
-							if(element not in self.found_alphas[el_i] and str(element).replace(".","").isdigit()==False):
-								self.found_alphas[el_i].append(element)
-								has_found_alpha = True
-						if(has_found_alpha == False):
-							break
-
-				if(prepro_vals["original_file"] != self.prev_file):
-					prev_translations = None
+					self.find_alpha_classes(data_by_row,prepro_vals["fields_to_ignore"])
+					self.target_has_encoded_alphas = False
+				
 				self.prev_file = prepro_vals["original_file"]
-				self.prev_translations = prepro_vals["translations"]
 				if(for_viewer == False):
 					self.user_interface.print_console("Finished processing "+name_for_new+".txt,  Check the "+self.folders_for_data["new"]+" folder")
 					self.user_interface.render_dataset_opts(True)
@@ -153,6 +140,45 @@ class data_processor():
 					return new_dataset_str
 				else:
 					return new_dataset
+
+
+
+	def find_alpha_classes(self,data_by_row,f_ig):
+		has_found_alpha = False
+		for row_i in range(1,len(data_by_row)):
+			row = data_by_row[row_i].split(",")
+			row = self.strip_row_list(row)
+			for el_i in range(0,len(row)):
+				if(el_i not in f_ig):
+					if(row_i == 1):
+						self.found_alphas[el_i] = []
+					elif row_i == 2 and has_found_alpha == False:
+						break
+
+					element = self.real_strip(row[el_i])
+					if(element not in self.found_alphas[el_i] and str(element).replace(".","").isdigit()==False):
+						self.found_alphas[el_i].append(element)
+						has_found_alpha = True
+			if(has_found_alpha == False):
+				break
+
+
+	def alpha_class_to_binary_vector(self,alpha_val,dataset_meta_alphas_list):
+		class_range = len(dataset_meta_alphas_list)
+		if(class_range>0):
+			if(alpha_val != None):
+				if(str(alpha_val) not in dataset_meta_alphas_list):
+					bin_vector = []
+					print(str(alpha_val),dataset_meta_alphas_list)
+				else:
+					target = dataset_meta_alphas_list.index(alpha_val)
+					bin_vector = self.populate_binary_vector(target,class_range)
+			else:
+				bin_vector = []
+		else:
+			bin_vector = [alpha_val]
+
+		return bin_vector
 
 
 	def validate_prepro(self):
@@ -167,7 +193,6 @@ class data_processor():
 		prepro_vals["target_val_pos"] = self.user_interface.prepro["target_val_pos"].get()
 		prepro_vals["target_type"] = self.user_interface.prepro["target_type"].get()
 		prepro_vals["rows_for_testing"] = self.user_interface.prepro["rows_for_testing"].get()
-		prepro_vals["found_alphas_trans"] = self.user_interface.prepro["found_alphas_trans"]
 		if(self.user_interface.prepro["bin_range"] == None):
 			prepro_vals["bin_range"] = None
 		else:
@@ -228,21 +253,6 @@ class data_processor():
 			error = "Invalid values to ignore"
 		else:
 			prepro_vals["fields_to_ignore"] = field_to_ig_try
-
-		prepro_vals["translations"] = {}
-		c = 0
-		if(len(prepro_vals["found_alphas_trans"])>0):
-			
-			for trans_field in prepro_vals["found_alphas_trans"]:
-				trans_input = prepro_vals["found_alphas_trans"][trans_field]
-				trans_input = trans_input.get()
-				trans_from_try =self.found_alphas[trans_field]
-				trans_to_try = self.user_interface.map_to_int_if_valid(trans_input)
-				prepro_vals["translations"][trans_field] = [0,0]
-				if(trans_to_try != False and trans_from_try != False):
-					prepro_vals["translations"][trans_field] = [trans_from_try,trans_to_try]
-				c+=1
-
 
 		def validate_divider(val):
 			if(val.replace(".","").isdigit() == False or val.replace(".","") == "0"):
@@ -311,19 +321,7 @@ class data_processor():
 										el_i = str(el_i)
 									if(el_i in dataset_meta["minimisations"]):
 										new_el = str(float(new_el)/dataset_meta["minimisations"][el_i])
-							
-							if(str(el_i) in dataset_meta["translations"]):
-								el_i = str(el_i)
-							if(el_i in dataset_meta["translations"]):
-								if(new_el in dataset_meta["translations"][el_i][0]):
-									trans_from = dataset_meta["translations"][el_i][0]
-									trans_to = dataset_meta["translations"][el_i][1]
-									if(len(trans_from) >0):
-										for from_i in range(0,len(trans_from)):
-											if(trans_from[from_i] == new_el):
-												if(from_i < len(trans_to)):
-													new_el = trans_to[from_i]
-					
+		
 					if(target_pos != None):									
 						if(el_i in target_pos):
 							if(is_valid_bin_target):
@@ -344,7 +342,8 @@ class data_processor():
 		self.file_name = file_name
 		self.user_interface.print_console("Loading "+str(self.to_retrieve)+" items from " + self.file_name + "... \n")
 		self.dataset = open(file_name, 'r').read().split("\n")
-		self.dataset_meta = json.loads(self.dataset[0])
+		self.dataset_meta =json.loads(self.dataset[0])
+		self.dataset_meta["alphas"] = self.sort_dataset_meta_alphas(self.dataset_meta["alphas"])
 		self.matrices = []
 		self.targets = []
 		self.max_data_amount = int(len(self.dataset))-2
@@ -369,6 +368,16 @@ class data_processor():
 			del row[0]
 		return row
 
+	def sort_dataset_meta_alphas(self,dataset_meta_alphas):
+		keys = []
+		for field_pos in dataset_meta_alphas:
+			keys.append(int(field_pos))
+		keys.sort()
+		new_meta = {}
+		for key in keys:
+			new_meta[key] = dataset_meta_alphas[str(key)]
+		return new_meta
+
 	def populate_matrices(self):
 		px_count = 0
 		done_msg = "Finished loading data \n "
@@ -381,9 +390,8 @@ class data_processor():
 			if(len(flat_single_item)>0):
 				target_string = flat_single_item[-1]
 				target_vals = target_string.split("/")
-				target_vals = map(float, target_vals)
 				del flat_single_item[-1]
-				item_as_array = np.asarray(flat_single_item, dtype=np.float32)
+				item_as_array = np.array(flat_single_item)
 				self.matrices.append(item_as_array)
 				self.targets.append(target_vals)
 			if(self.to_retrieve > 10):
@@ -403,7 +411,7 @@ class data_processor():
 				avaliable_txts.append(f)
 		return avaliable_txts
 
-	def populate_target_vector(self,target,output_count):
+	def populate_binary_vector(self,target,output_count):
 		vector = []
 		if(target < output_count):
 			for i in range(0,int(output_count)):
@@ -411,4 +419,4 @@ class data_processor():
 			vector[int(target)] = 1
 			return vector
 		else:
-			return -1
+			return 0
