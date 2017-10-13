@@ -44,7 +44,6 @@ class user_interface:
 
 	def quit_all(self):
 		self.tk_main.destroy()
-		os._exit(0)
 		sys.exit()
 
 	def render_ui_frames(self):
@@ -74,7 +73,7 @@ class user_interface:
 
 		rcParams.update({'figure.autolayout': True})
 
-		self.line_colors = ["blue","green","red","magneta","cyan","yellow"]
+		self.line_colors = ["orange","blue","green","red","cyan","pink","gray","yellow","lime","brown", "black","purple", "gold"]
 		self.render_graph("% Of Error (from 1000 feedforwards)","1000 forward feeds","%",0,"r")
 		self.render_graph("% Of Success (from test data each Epoch)","Epoch","%",1,"b")
 		self.prepare_new_line_graph()
@@ -96,7 +95,7 @@ class user_interface:
 	def render_canvas_info_labels(self):
 		self.canvas_info_labels = {}
 		self.canvas_info_label_vals = {}
-		self.canvas_label_names = ["Latest Success", "Epoch Duration"]
+		self.canvas_label_names = ["Latest Success", "Epoch Duration", "Dataset Size"]
 		label_y = 30
 		for label_name in self.canvas_label_names:
 			self.canvas_info_label_vals[label_name] = StringVar()
@@ -150,8 +149,10 @@ class user_interface:
 			self.prepare_new_line_graph()
 
 	def prepare_new_line_graph(self):
+		if(self.new_line_count >= len(self.line_colors)):
+			self.new_line_count = 0
 		for line in range(2):
-			new_line, = self.g_axis[line].plot([], [], self.line_colors[self.new_line_count][0:1]+"-")
+			new_line, = self.g_axis[line].plot([], [], self.line_colors[self.new_line_count])
 			self.g_lines[line].append(new_line)
 		self.new_line_count += 1
 
@@ -326,10 +327,9 @@ class user_interface:
 		if(self.input_fields["dataset_name"].get() != "--select--"):
 			dataset = open(self.data_processor.folders_for_data["new"]+"/"+self.input_fields["dataset_name"].get(), 'r').read().split("\n")
 			self.dataset_row_count = len(dataset)-1
+			self.update_canvas_info_label("Dataset Size", self.dataset_row_count)
 			dataset_meta = json.loads(dataset[0])
-			print(dataset_meta["alphas"])
 			dataset_meta["alphas"] = self.data_processor.sort_dataset_meta_alphas(dataset_meta["alphas"])
-			print(dataset_meta["alphas"])
 			sample_dataset_row = dataset[3].split(",")
 			self.expected_input_count = 0
 			for item_i in dataset_meta["alphas"]:
@@ -687,7 +687,7 @@ class user_interface:
 						if(el == None):
 							del processed_row[el_i]
 						el_i += 1
-					matrix_ready = np.array(processed_row)
+					matrix_ready = np.asarray(processed_row, dtype=np.float32)
 				elif(file_type_str in valid_files):
 					image_matrix = cv2.imread(file_name)
 					image_matrix = cv2.cvtColor(image_matrix, cv2.COLOR_BGR2GRAY)
@@ -700,18 +700,16 @@ class user_interface:
 				self.neural_network.feed_forward(matrix_ready)
 				
 				output_neurons = self.neural_network.nn_neurons[-1].tolist()
-				print(output_neurons)
 				output_pos_result = output_neurons.index(max(output_neurons))
 				if(len(output_neurons)>1):
 					if(self.dataset_meta["target_info"][0]=="Alpha Encoded"):
 						c = 0
 						for targ_pos in self.dataset_meta["target_info"][2]:
 							alphas = self.dataset_meta["alphas"][targ_pos]
-							print(alphas)
 							output_pos_result = alphas[output_pos_result]
 							c += 1
 					elif(self.dataset_meta["target_info"][0]=="Binary"):
-						output_pos_result = output_neurons
+						output_pos_result = output_neurons.index(max(output_neurons))
 
 				else:
 					output_pos_result = output_neurons
@@ -800,8 +798,8 @@ class user_interface:
 			error = "Invalid data to test entry"
 		else:
 			valid_values['data_to_test'] = int(data_to_test_count)
-			if(valid_values['data_to_test'] > 50):
-				error = "Data to test should be under 50%"
+			if(valid_values['data_to_test'] > 100):
+				error = "Data to test should be under 100%"
 
 		valid_values['success'] = True
 
@@ -845,13 +843,14 @@ class user_interface:
 			self.matrix_data = self.data_processor.matrices
 			self.matrix_targets = self.data_processor.targets
 			self.dataset_meta = self.data_processor.dataset_meta
+			self.has_alphas = self.data_processor.has_alphas
 		
 		self.neural_network = neural_network()
 		self.neural_network.initilize_nn(field_result['hidden_layers'],
 				self.input_neuron_count,field_result['output_count'], self.matrix_data,self.matrix_targets,
 				field_result['biases_for_non_input_layers'], field_result['learning_constant'], 
 				testing_mode,field_result['weight_range'],field_result['epochs'],field_result['data_to_test'],
-				self.dataset_meta,self.dataset_row_count,self)
+				self.dataset_meta,self.dataset_row_count,self.has_alphas,self)
 		self.prev_to_retrieve_val = field_result['to_retrieve']
 		self.neural_network.train()
 

@@ -1,5 +1,5 @@
 from __future__ import print_function
-import cv2,re,numpy as np,random,math,time,thread,decimal,tkMessageBox,tkSimpleDialog
+import cv2,re,numpy as np,random,math,time,thread,decimal,tkMessageBox,tkSimpleDialog,timeit
 
 class neural_network:
 
@@ -7,20 +7,19 @@ class neural_network:
 	def initilize_nn(self, hidden_layers,
 					input_count, output_count, matrix_data,matrix_targets,
 					biases_for_non_input_layers, learning_constant,
-					testing_mode,weight_range,epochs,data_to_test,dataset_meta,data_total,user_interface):
+					testing_mode,weight_range,epochs,data_to_test,dataset_meta,data_total,has_alphas,user_interface):
 
 		self.user_interface = user_interface
 		if(self.user_interface.cancel_training == False):
 			self.user_interface.print_console("\n\n\n--------------------------- \n Constructing neural network \n\n")
 			self.all_weights = []
 			self.nn_neurons = []
-			self.weight_changes = []
 			self.biases_weights = []
-			self.biases_weight_changes = []
 			self.epochs = epochs
 			divider_to_test = float(data_to_test)/100.0
 			self.test_data_amount = int(round(divider_to_test*data_total))
 			self.dataset_meta = dataset_meta
+			self.has_alphas = has_alphas
 			self.matrix_data = matrix_data
 			self.hidden_layers = hidden_layers
 			self.matrix_targets = matrix_targets
@@ -52,17 +51,16 @@ class neural_network:
 		for neuron_layer in range(1, len(self.nn_neurons)):
 			layer_length = len(self.nn_neurons[neuron_layer])
 			weight_layer = []
-			weight_changes_layer = []
+
 			for single_neuron in range(0, layer_length):
 				prev_layer_count = len(self.nn_neurons[neuron_layer-1])
 				neuron_weights = self.initilize_weights(prev_layer_count)
 				weights_change_record_neuron = np.zeros(prev_layer_count)
 		
 				weight_layer.append(neuron_weights)
-				weight_changes_layer.append(weights_change_record_neuron)
 
 			self.all_weights.append(weight_layer)
-			self.weight_changes.append(weight_changes_layer)
+
 
 		for layer_count in range(0, len(self.biases_for_non_input_layers)):
 			single_bias_weights = []
@@ -72,7 +70,7 @@ class neural_network:
 				single_bias_weights = self.initilize_weights(bias_input_count)
 				single_bias_weights_change = np.zeros(bias_input_count)
 			self.biases_weights.append(single_bias_weights)
-			self.biases_weight_changes.append(single_bias_weights_change)
+
 
 	def initilize_weights(self,size):
 		if(len(self.weight_range)==1):
@@ -85,7 +83,10 @@ class neural_network:
 		return np.random.uniform(low=lower_bound, high=upper_bound, size=(size))
 
 	def feed_forward(self, matrix):
+
+		
 		self.populate_input_layer(matrix)
+
 		for after_input_layer in range(1, len(self.nn_neurons)):
 			hidden_neuron_sums = np.dot(np.asarray(self.all_weights[after_input_layer-1]) , self.nn_neurons[after_input_layer-1])
 			if(len(self.biases_weights[after_input_layer-1])!=0):
@@ -95,14 +96,18 @@ class neural_network:
 	
 
 	def populate_input_layer(self, data):
-		encoded_input = []
-		item_i = 0
-		for item_pos in self.dataset_meta["alphas"]:
-			if(int(item_pos) not in self.dataset_meta["target_info"][2]):
-				bin_vec = self.user_interface.data_processor.alpha_class_to_binary_vector(data[item_i], self.dataset_meta["alphas"][item_pos])
-				encoded_input += bin_vec
-				item_i += 1
-		self.nn_neurons[0] = np.array(encoded_input, dtype=np.float32)
+		if(self.has_alphas):
+			encoded_input = []
+			item_i = 0
+			for item_pos in self.dataset_meta["alphas"]:
+				if(int(item_pos) not in self.dataset_meta["target_info"][2]):
+					bin_vec = self.user_interface.data_processor.alpha_class_to_binary_vector(data[item_i], self.dataset_meta["alphas"][item_pos])
+					encoded_input += bin_vec
+					item_i += 1
+
+		else:
+			encoded_input = data
+		self.nn_neurons[0] = encoded_input
 
 
 	testing_output_mode = False
@@ -129,9 +134,9 @@ class neural_network:
 		
 		target_vector = self.construct_target_for_bp(target_val)
 
+
 		if(len(self.nn_neurons[-1])>1):
 			outputs_as_list = self.nn_neurons[-1].tolist()
-
 			success_condition = (outputs_as_list.index(max(outputs_as_list))==target_vector.index(max(target_vector)))
 		else:
 
@@ -144,6 +149,7 @@ class neural_network:
 				self.error_by_1000 += 1
 
 		if(self.error_by_1000_counter % 1000 == 0):
+			
 			self.user_interface.animate_graph_figures(0,self.error_by_1000/10)
 			self.error_by_1000 = 0
 			self.error_by_1000_counter = 0
@@ -203,6 +209,7 @@ class neural_network:
 					break
 
 				success_p = (float(self.correct_count)/float(self.test_data_amount))*100
+				
 				self.user_interface.animate_graph_figures(1,success_p)
 				e_note_str = " (ep. "+str(epoch)+")"
 				success_list.append(success_p)
@@ -220,7 +227,7 @@ class neural_network:
 			if(len(success_list)>0):
 				av_success = sum(success_list)/len(success_list)
 				highest_success = max(success_list)
-				av_epoch_time = sum(epoch_times)/len(epoch_times)
+				av_epoch_time = round(sum(epoch_times)/len(epoch_times),5)
 			else:
 				av_success = "N/A"
 				highest_success = "N/A"
@@ -234,7 +241,7 @@ class neural_network:
 			self.user_interface.print_console("AVERAGE SUCCESS: " + str(av_success) + "%")
 			self.user_interface.print_console("HIGHEST SUCCESS: " + str(highest_success) + "%")
 			self.user_interface.print_console("TOTAL TIME: " + str(sum(epoch_times)) + "s")
-			self.user_interface.print_console("AVERAGE EPOCH TIME: " + str(round(av_epoch_time,5)) + "s")
+			self.user_interface.print_console("AVERAGE EPOCH TIME: " + str(av_epoch_time) + "s")
 
 	def activate_threshold(self,value, type):
 		if(type == "step"):

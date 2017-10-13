@@ -41,7 +41,6 @@ class data_processor():
 				start = 0
 
 				if(len(self.found_alphas)>0):
-					print(self.found_alphas)
 					for ig in prepro_vals["fields_to_ignore"]:
 						if(ig in self.found_alphas.keys()):
 							del self.found_alphas[ig]
@@ -144,6 +143,7 @@ class data_processor():
 
 
 	def find_alpha_classes(self,data_by_row,f_ig):
+		self.found_alphas = {}
 		has_found_alpha = False
 		for row_i in range(1,len(data_by_row)):
 			row = data_by_row[row_i].split(",")
@@ -156,7 +156,7 @@ class data_processor():
 						break
 
 					element = self.real_strip(row[el_i])
-					if(element not in self.found_alphas[el_i] and str(element).replace(".","").isdigit()==False):
+					if(element not in self.found_alphas[el_i] and str(element).replace(".","").replace("-","").isdigit()==False):
 						self.found_alphas[el_i].append(element)
 						has_found_alpha = True
 			if(has_found_alpha == False):
@@ -169,14 +169,13 @@ class data_processor():
 			if(alpha_val != None):
 				if(str(alpha_val) not in dataset_meta_alphas_list):
 					bin_vector = []
-					print(str(alpha_val),dataset_meta_alphas_list)
 				else:
 					target = dataset_meta_alphas_list.index(alpha_val)
 					bin_vector = self.populate_binary_vector(target,class_range)
 			else:
 				bin_vector = []
 		else:
-			bin_vector = [alpha_val]
+			bin_vector = [float(alpha_val)]
 
 		return bin_vector
 
@@ -344,6 +343,7 @@ class data_processor():
 		self.dataset = open(file_name, 'r').read().split("\n")
 		self.dataset_meta =json.loads(self.dataset[0])
 		self.dataset_meta["alphas"] = self.sort_dataset_meta_alphas(self.dataset_meta["alphas"])
+		self.has_alphas = self.meta_has_alphas(self.dataset_meta)
 		self.matrices = []
 		self.targets = []
 		self.max_data_amount = int(len(self.dataset))-2
@@ -378,6 +378,16 @@ class data_processor():
 			new_meta[key] = dataset_meta_alphas[str(key)]
 		return new_meta
 
+	def meta_has_alphas(self,meta):
+		has_alphas = False
+		for i in meta["alphas"]:
+			if(len(meta["alphas"][i]) > 0):
+				has_alphas = True;
+				break;
+
+		return has_alphas;
+
+
 	def populate_matrices(self):
 		px_count = 0
 		done_msg = "Finished loading data \n "
@@ -391,7 +401,10 @@ class data_processor():
 				target_string = flat_single_item[-1]
 				target_vals = target_string.split("/")
 				del flat_single_item[-1]
-				item_as_array = np.array(flat_single_item)
+				if(self.has_alphas == True):
+					item_as_array = np.array(flat_single_item)
+				else:
+					item_as_array = np.asarray(flat_single_item, dtype=np.float32)
 				self.matrices.append(item_as_array)
 				self.targets.append(target_vals)
 			if(self.to_retrieve > 10):
@@ -413,10 +426,11 @@ class data_processor():
 
 	def populate_binary_vector(self,target,output_count):
 		vector = []
+		target = int(target)
 		if(target < output_count):
 			for i in range(0,int(output_count)):
 				vector.append(0)
-			vector[int(target)] = 1
+			vector[target] = 1
 			return vector
 		else:
 			return 0
