@@ -18,6 +18,7 @@ class user_interface:
 	frame_width = 1200
 
 	def __init__(self, tk_main):
+		# Set up main UI constants
 		self.tk_main = tk_main
 		self.main_bg="#81899f"
 		self.ui_frame = Frame(self.tk_main)
@@ -43,15 +44,16 @@ class user_interface:
 		self.render_ui_widgets()
 
 	def quit_all(self):
+		# Quit program
 		self.tk_main.destroy()
 		sys.exit()
 
 	def render_ui_frames(self):
 
+		# Render all UI frames, set up dimensions and positions
 		self.learn_options_frame = Frame(self.ui_frame,background=self.main_bg)
 		self.learn_options_frame.pack(fill=BOTH,side=LEFT)
-		#self.console_frame = Frame(self.ui_frame,bg="grey",height=300,width=400)
-		#self.console_frame.pack()
+
 		self.c_scrollbar = Scrollbar(self.tk_main)
 		self.c_scrollbar.pack(side=RIGHT, fill=Y)
 
@@ -72,14 +74,14 @@ class user_interface:
 		self.g_canvas = range(2)
 
 		rcParams.update({'figure.autolayout': True})
-
+		# Render graphs and list of all future line colours for different network representations 
 		self.line_colors = ["orange","blue","green","red","cyan","pink","gray","yellow","lime","brown", "black","purple", "gold"]
 		self.render_graph("% Of Error (from 1000 feedforwards)","1000 forward feeds","%",0,"r")
 		self.render_graph("% Of Success (from test data each Epoch)","Epoch","%",1,"b")
-		self.prepare_new_line_graph()
+		self.prepare_new_line_graph() # Ready the first lines on graph
 
 	def render_graph(self,title,xlabel,ylabel,line_num,col):
-
+		# Render a graph, set up plotting with design and axis
 		self.g_figures[line_num] =  plt.figure(facecolor=self.main_bg)
 		self.g_axis[line_num] = self.g_figures[line_num].add_subplot(111,axisbg="#b3b8c5")
 		self.g_axis[line_num].set_ylabel(ylabel)
@@ -93,6 +95,7 @@ class user_interface:
 
 
 	def render_canvas_info_labels(self):
+		# Add labels from labels list just under the text inputs, for general information
 		self.canvas_info_labels = {}
 		self.canvas_info_label_vals = {}
 		self.canvas_label_names = ["Latest Success", "Epoch Duration", "Dataset Size"]
@@ -113,6 +116,7 @@ class user_interface:
 	all_g1_annotations = []
 
 	def animate_graph_figures(self, line,data):
+		# Update / animate graphs when new data recieved from neural network training
 		if(self.axis_g_showing[line]==False):
 			self.g_axis[line].get_yaxis().set_visible(True)
 			self.g_axis[line].get_xaxis().set_visible(True)
@@ -125,16 +129,9 @@ class user_interface:
 		self.g_axis[line].relim()
 		self.g_axis[line].autoscale_view()
 
-		'''	if(line==1): 
-			if(round(data)!=self.prev_line_1_data):
-				data = round(data,2)
-				self.all_g1_annotations.append(self.g_axis[line].annotate(str(data)+"%",(len(ydata)-1,data)))
-				self.all_g1_annotations[-1].set_fontsize(7)
-			self.prev_line_1_data = round(data)'''
-
 		self.g_figures[line].canvas.draw()
 
-	def clear_graphs(self):
+	def clear_graphs(self):# Reset graphs, reset colours, etc
 		if(self.can_clear_graph==True):
 			for ann in range(len(self.all_g1_annotations)):
 				self.all_g1_annotations[ann].remove()
@@ -148,7 +145,8 @@ class user_interface:
 			self.can_clear_graph = False
 			self.prepare_new_line_graph()
 
-	def prepare_new_line_graph(self):
+	def prepare_new_line_graph(self): # Add new line to graph, one for each graph,
+		# where new_line_count is index of colour list
 		if(self.new_line_count >= len(self.line_colors)):
 			self.new_line_count = 0
 		for line in range(2):
@@ -160,6 +158,7 @@ class user_interface:
 		tkMessageBox.showinfo(header, msg)
 
 
+	# Set default values for hyperparameters to demonstrate visual aid
 	input_text_length = 8
 	default_hidden_layers_str = "6,9"
 	default_bias_str = "1,1,1"
@@ -167,14 +166,15 @@ class user_interface:
 	default_data_set_str = ".txt"
 	default_output_count = "2"
 
+	# Event handler when hyparameter changed. On key change, update visual NN aid
 	def render_nn_vis_trigger(self,event=None):
 
-		if(event==None):
+		if(event==None): # If first render, use default values
 			hidden_str = self.default_hidden_layers_str
 			bias_str = self.default_bias_str
 			input_dims = self.default_input_dims
 			output_count = int(self.default_output_count)
-		else:
+		else: # Otherwise, update based on text inputs
 			hidden_str = self.input_fields["hidden_layer"].get()
 			bias_str = self.input_fields["bias_vals"].get()
 			input_dims = self.input_fields["matrix_dims"].get()
@@ -183,7 +183,7 @@ class user_interface:
 				output_count = int(output_count_str)
 			else:
 				output_count = -1
-
+		# If values valid to reflect on visual aid, call renderer
 		if(self.check_str_list_valid(hidden_str+bias_str) == True and hidden_str != "" and bias_str != "" and input_dims != ""):
 			if(hidden_str[-1]==","):
 				hidden_str = hidden_str[0:-1]
@@ -203,9 +203,11 @@ class user_interface:
 				layers = map(int,layers)
 				biases = map(int,biases)
 				if(len(layers) > 0 and len(biases) > 0):
+					# Update visual aid 
 					self.render_neural_net_visualization(layers,biases)
 
 	def render_dataset_opts(self,exists=False):
+		# Find avaliable datasets from processed datasets folder, and use as options
 		avaliable_datasets = ["--select--"]
 		for file in self.data_processor.get_avaliable_datasets("new"):
 			avaliable_datasets.append(file)
@@ -216,6 +218,7 @@ class user_interface:
 				field.destroy()
 			self.input_fields["dataset_name"] = StringVar(self.tk_main)
 			self.input_fields["dataset_name"] 
+			# Render the drop down menu
 			opt = OptionMenu(self.all_drop_frames["Dataset File: "], self.input_fields["dataset_name"],command=self.update_expected_nn_io_fields,*avaliable_datasets)
 			self.style_drop_manual(opt)
 			opt.config(width=15)
@@ -224,8 +227,10 @@ class user_interface:
 
 
 	def render_ui_widgets(self):
+		
 		self.render_nn_vis_trigger()
 		
+		# Define all frames and widgets
 		icon = ImageTk.PhotoImage(Image.open("resources/perceptron-header.png").resize((230, 100), Image.ANTIALIAS))
 		self.icon_view = Label(self.learn_options_frame,image=icon,highlightthickness=0,bg=self.main_bg)
 		self.icon_view.image = icon
@@ -245,6 +250,7 @@ class user_interface:
 
 		self.open_prepro_window = self.render_option("DATA PREPROCESSOR", self.preprocess_data_render, self.learn_options_frame,width=18)
 
+		# Define all input fields
 		self.render_dataset_opts()
 		self.input_fields["data_to_retrieve"]= self.render_input_field("all", "Data To Use","Enter 'all' or number of items to use from dataset",self.input_text_length,self.learn_options_frame)
 		self.input_fields["matrix_dims"] = self.render_input_field(self.default_input_dims,"Input Count","Enter single value or enter height, width of matrix with comma",self.input_text_length,self.learn_options_frame,command=self.render_nn_vis_trigger)
@@ -256,6 +262,7 @@ class user_interface:
 		self.input_fields["epochs"] = self.render_input_field("100", "Epochs","Total number of iterations through all data loaded",self.input_text_length, self.learn_options_frame)
 		self.input_fields["test_data_partition"] = self.render_input_field("10", "Data for Testing (%)","Amount of data to partition from dataset for result testing (as a percentage)",self.input_text_length, self.learn_options_frame)
 		
+		# Set frame positions
 		self.mid_labels_frame = Frame(self.learn_options_frame,bg=self.main_bg)
 		self.mid_labels_frame.pack(expand=True,fill=BOTH)
 		self.render_canvas_info_labels()
@@ -268,6 +275,7 @@ class user_interface:
 		self.right_opt_col = Frame(self.opt_cols,background=self.main_bg)
 		self.right_opt_col.pack(side=RIGHT)
 
+		# Defines all buttons
 		self.start_learning_opt = self.render_option("Start Learning", self.start_learning_ui_request, self.left_opt_col)
 		self.cancel_learning_opt = self.render_option("Stop Learning", self.cancel_learning, self.left_opt_col)
 		self.cancel_learning_opt.config(state="disabled")
@@ -281,6 +289,7 @@ class user_interface:
 		self.print_console("Welcome to Perceptron. To get started, preprocess a dataset and then design a neural network for it to use. For more information, see the README file. Click this console to scroll it.")
 
 	def render_input_field(self,default_value, label_text,desc_text,width,parent_frame,command=None,drop=None):
+			# Render input field with frame and label
 			label_text = label_text+": "
 			self.widget_frames[label_text] = Frame(parent_frame,background=self.main_bg)
 			self.widget_frames[label_text].pack(fill=X,expand=False)
@@ -324,6 +333,7 @@ class user_interface:
 		return option
 
 	def update_expected_nn_io_fields(self,event=None):
+		# Search dataset, get length data and predicted layer dimensions
 		if(self.input_fields["dataset_name"].get() != "--select--"):
 			dataset = open(self.data_processor.folders_for_data["new"]+"/"+self.input_fields["dataset_name"].get(), 'r').read().split("\n")
 			self.dataset_row_count = len(dataset)-1
@@ -392,6 +402,7 @@ class user_interface:
 			new_file.write(weights_as_json)
 
 	def load_settings(self,value):
+		# Load JSON settings and put values into input fields
 		setting_to_load = self.saved_settings_text.get()
 		if(setting_to_load != self.saved_settings_dis_text):
 			settings_file_json = json.loads(open(self.settings_file_name, "r").read())
@@ -426,6 +437,8 @@ class user_interface:
 		self.saved_settings_text.set(saved_settings[0])
 
 	def save_settings(self):
+		# Take values from input fields and construct JSON object to save
+		# Also give setting state a name for future ident.
 		settings_name = tkSimpleDialog.askstring("Saving Settings", "Setting's Name: ")
 		if(settings_name != None):
 			if(len(settings_name)>1):
@@ -663,6 +676,7 @@ class user_interface:
 			tkMessageBox.showinfo("Error", poss_errors)
 
 	def test_input(self):
+		# Allow for different forms of input
 		input_str = tkSimpleDialog.askstring("Enter Input", "Enter the name of an image file, text file, 'MNIST' for the demo, or enter row data manually: ")
 		if(input_str):
 			file_type_pos = input_str.rfind(".")
@@ -697,6 +711,7 @@ class user_interface:
 					output_pos_result = -1
 					self.print_console("**ERROR: invalid test input")
 
+				# Having taken different forms of input, construct conforming matrix for input layer
 				self.neural_network.feed_forward(matrix_ready)
 				
 				output_neurons = self.neural_network.nn_neurons[-1].tolist()
@@ -736,6 +751,7 @@ class user_interface:
 		self.console_list_box.configure(state="disabled")
 
 	def check_all_fields_valid(self):
+		# Validate all inputs to check correect ints or list
 		hidden_str = self.input_fields["hidden_layer"].get()
 		bias_str = self.input_fields["bias_vals"].get()
 		error = ""
@@ -829,11 +845,13 @@ class user_interface:
 	input_neuron_count = 0
 	prev_to_retrieve_val = ""
 
+	# Start new thread for training, to prevent crash on main thread.
 	def start_learning_in_thread(self):
 		field_result = self.field_result
 		testing_mode = False
 		if(field_result['to_retrieve']!=self.prev_to_retrieve_val or field_result['data_file_name'] != self.curr_dataset_name):
 
+			# Initiate hyperparameters for neural network
 			self.curr_dataset_name = field_result['data_file_name']
 			self.matrix_dims = field_result['matrix_dims']
 			self.data_processor.load_matrix_data(field_result['to_retrieve'],field_result['data_file_name'],self)
@@ -845,6 +863,7 @@ class user_interface:
 			self.dataset_meta = self.data_processor.dataset_meta
 			self.has_alphas = self.data_processor.has_alphas
 		
+		# Initiate neural network!
 		self.neural_network = neural_network()
 		self.neural_network.initilize_nn(field_result['hidden_layers'],
 				self.input_neuron_count,field_result['output_count'], self.matrix_data,self.matrix_targets,
@@ -891,6 +910,8 @@ class user_interface:
 		def get_layer_height_px(layer_count):
 			return (layer_count*(neuron_radius*2 + neuron_padding))
 
+
+		# Check neuron layers for maximum lengths and heights
 		for neuron_layer in range(0,len(layers)):
 			length_of_layer = layers[neuron_layer]
 			if(example_p_limit_count > 0 and example_p_limit_count < length_of_layer):
@@ -899,6 +920,7 @@ class user_interface:
 			if(curr_layer_height > highest_layer_height):
 				highest_layer_height = curr_layer_height
 
+		# Render actual neurons and labels
 		for neuron_layer in range(0,len(layers)):
 			length_of_layer = layers[neuron_layer]
 			if(example_p_limit_count > 0 and example_p_limit_count < length_of_layer):

@@ -14,6 +14,7 @@ class data_processor():
 	row_len = -1
 	target_has_encoded_alphas = False
 	def struct_dataset(self, for_viewer, return_str,prepro_vals):
+		# Update live viewer and if ready, update dataset
 		new_dataset_str = ""
 		new_dataset = []
 		if(len(prepro_vals["row_separator_char"]) > 0 and os.path.isfile(self.folders_for_data["old"]+"/"+prepro_vals["original_file"])):
@@ -91,7 +92,7 @@ class data_processor():
 							new_target_list_for_dis = "[" +(','.join(str(e) for e in encoded_targets))+ "]"	
 						else:
 							new_target_list_for_dis = "["+new_target_list.replace("/",",")+"]"
-						
+						# Make target structure and turn into string for viewing
 						if(new_target_list_for_dis != "[]"):
 							new_target_list_for_dis = "with target(s): "+new_target_list_for_dis
 						else:
@@ -145,6 +146,7 @@ class data_processor():
 	def find_alpha_classes(self,data_by_row,f_ig):
 		self.found_alphas = {}
 		has_found_alpha = False
+		# Start finding  all classification alphas per field 
 		for row_i in range(1,len(data_by_row)):
 			row = data_by_row[row_i].split(",")
 			row = self.strip_row_list(row)
@@ -181,6 +183,7 @@ class data_processor():
 
 
 	def validate_prepro(self):
+
 		prepro_vals = {}
 		valid_for_viewer = True
 		error = ""
@@ -389,6 +392,7 @@ class data_processor():
 
 
 	def populate_matrices(self):
+		
 		px_count = 0
 		done_msg = "Finished loading data \n "
 		prev_pos_of_matrix = 0
@@ -418,6 +422,7 @@ class data_processor():
 		return matrix_for_input
 
 	def get_avaliable_datasets(self, from_):
+		# Search orginial_datasets folder for text files
 		avaliable_txts = []
 		for f in os.listdir(self.folders_for_data[from_]):
 			if(f[-4:] == ".txt"):
@@ -425,6 +430,7 @@ class data_processor():
 		return avaliable_txts
 
 	def populate_binary_vector(self,target,output_count):
+		# Take index value, and construct binary vector where element of index is 1
 		vector = []
 		target = int(target)
 		if(target < output_count):
